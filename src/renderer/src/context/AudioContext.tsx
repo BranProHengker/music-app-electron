@@ -43,12 +43,13 @@ export interface AudioContextType {
 
 export const AudioContext = createContext<AudioContextType | undefined>(undefined)
 
-// Helper to determine the audio source URL (local protocol vs HTTP streaming)
 const getAudioUrl = (filePath: string): string => {
   if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
     return filePath
   }
-  return `media://${encodeURI(filePath)}`
+  // encodeURI encodes spaces/etc. but leaves ? and # alone.
+  // We manually encode ? to %3F and # to %23 so they are not treated as URL delimiters.
+  return `media://${encodeURI(filePath).replace(/\?/g, '%3F').replace(/#/g, '%23')}`
 }
 
 export const AudioProvider = ({ children }: { children: React.ReactNode }) => {

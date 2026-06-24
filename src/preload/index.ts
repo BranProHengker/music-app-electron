@@ -10,7 +10,9 @@ const musicAPI = {
   saveSettings: (settings: Record<string, unknown>): Promise<boolean> =>
     ipcRenderer.invoke('save-settings', settings),
   getCoverArt: (filePath: string): Promise<string | null> =>
-    ipcRenderer.invoke('get-cover-art', filePath)
+    ipcRenderer.invoke('get-cover-art', filePath),
+  selectFiles: (): Promise<string[] | null> => ipcRenderer.invoke('select-files'),
+  importFiles: (filePaths: string[]): Promise<unknown[]> => ipcRenderer.invoke('import-files', filePaths)
 }
 
 // Use contextBridge to expose APIs securely

@@ -307,6 +307,80 @@ app.whenReady().then(async () => {
     }
   })
 
+  // ─── IPC: Select Files ───────────────────────────────────────────
+  ipcMain.handle('select-files', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Audio Files', extensions: ['mp3', 'flac', 'wav', 'm4a', 'ogg', 'aac', 'wma'] }
+      ],
+      title: 'Select Audio Files to Import'
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths
+  })
+
+  // ─── IPC: Import Files ───────────────────────────────────────────
+  ipcMain.handle('import-files', async (_event, filePaths: string[]) => {
+    try {
+      const { parseFile } = await import('music-metadata')
+      const currentTracks = await loadLibrary()
+      
+      const newTracks: TrackMeta[] = []
+      for (const file of filePaths) {
+        if (currentTracks.some(t => t.filePath === file)) continue
+        try {
+          const metadata = await parseFile(file)
+          const common = metadata.common
+          const format = metadata.format
+
+          let coverArt: string | null = null
+          if (common.picture && common.picture.length > 0) {
+            const pic = common.picture[0]
+            const base64 = Buffer.from(pic.data).toString('base64')
+            coverArt = `data:${pic.format};base64,${base64}`
+          }
+
+          newTracks.push({
+            filePath: file,
+            title: common.title || file.split('/').pop()?.replace(/\.[^.]+$/, '') || 'Unknown',
+            artist: common.artist || 'Unknown Artist',
+            album: common.album || 'Unknown Album',
+            duration: format.duration || 0,
+            trackNumber: common.track?.no || null,
+            year: common.year || null,
+            genre: common.genre?.[0] || null,
+            coverArt,
+            bitrate: format.bitrate,
+            sampleRate: format.sampleRate,
+            bitsPerSample: format.bitsPerSample,
+            lossless: format.lossless,
+            container: format.container
+          })
+        } catch (err) {
+          console.warn(`Could not parse metadata for: ${file}`, err)
+        }
+      }
+
+      if (newTracks.length > 0) {
+        const updatedTracks = [...currentTracks, ...newTracks]
+        updatedTracks.sort((a, b) => {
+          const artistCmp = a.artist.localeCompare(b.artist)
+          if (artistCmp !== 0) return artistCmp
+          const albumCmp = a.album.localeCompare(b.album)
+          if (albumCmp !== 0) return albumCmp
+          return (a.trackNumber || 0) - (b.trackNumber || 0)
+        })
+        await saveLibrary(updatedTracks)
+        return updatedTracks
+      }
+      return currentTracks
+    } catch (error) {
+      console.error('Import error:', error)
+      return []
+    }
+  })
+
   createWindow()
 
   app.on('activate', () => {

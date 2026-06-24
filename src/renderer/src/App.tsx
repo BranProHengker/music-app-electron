@@ -237,6 +237,24 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  const handleImportFiles = async () => {
+    if (isScanning) return
+    setIsScanning(true)
+    try {
+      const selected = await window.api.selectFiles()
+      if (selected && selected.length > 0) {
+        const updated = await window.api.importFiles(selected)
+        if (updated && Array.isArray(updated)) {
+          setTracks(updated as TrackMeta[])
+        }
+      }
+    } catch (err) {
+      console.error('Import files error:', err)
+    } finally {
+      setIsScanning(false)
+    }
+  }
+
   // ─── Playlists Management ──────────────────────────────────────────
   const handleCreatePlaylist = async () => {
     const name = prompt('Enter playlist name:')
@@ -370,7 +388,9 @@ export default function App(): React.JSX.Element {
         setActivePlaylist={(playlistName) => {
           setActivePlaylist(playlistName)
           setActiveAlbum(null)
-          setCurrentView('library')
+          if (playlistName !== null) {
+            setCurrentView('library')
+          }
         }}
         onCreatePlaylist={handleCreatePlaylist}
       />
@@ -425,6 +445,17 @@ export default function App(): React.JSX.Element {
                 </div>
               </div>
 
+              <div className="settings-row">
+                <div className="settings-label">
+                  <span className="settings-title">Load Music Files</span>
+                  <span className="settings-subtitle">Select individual audio files to import directly into your library</span>
+                </div>
+                <button className="btn-primary" onClick={handleImportFiles} disabled={isScanning}>
+                  <FolderOpen size={16} weight="light" />
+                  <span>Import Audio Files</span>
+                </button>
+              </div>
+
               {libraryFolder && (
                 <div className="settings-row">
                   <div className="settings-label">
@@ -439,6 +470,44 @@ export default function App(): React.JSX.Element {
                   </button>
                 </div>
               )}
+            </div>
+
+            <h2 className="section-title" style={{ marginTop: '8px', marginBottom: '0' }}>Keyboard Shortcuts (Keybinds)</h2>
+            <div className="settings-section">
+              <div className="keybinds-grid">
+                <div className="keybind-row">
+                  <span className="keybind-action">Play / Pause</span>
+                  <kbd className="keybind-key">Space</kbd>
+                </div>
+                <div className="keybind-row">
+                  <span className="keybind-action">Next Track</span>
+                  <kbd className="keybind-key">Ctrl + Right Arrow</kbd>
+                </div>
+                <div className="keybind-row">
+                  <span className="keybind-action">Previous Track</span>
+                  <kbd className="keybind-key">Ctrl + Left Arrow</kbd>
+                </div>
+                <div className="keybind-row">
+                  <span className="keybind-action">Focus & Select Search</span>
+                  <kbd className="keybind-key">Ctrl + F</kbd>
+                </div>
+                <div className="keybind-row">
+                  <span className="keybind-action">Toggle Shuffle Mode</span>
+                  <kbd className="keybind-key">Ctrl + R</kbd>
+                </div>
+                <div className="keybind-row">
+                  <span className="keybind-action">Volume Control</span>
+                  <kbd className="keybind-key">Ctrl + Scroll Wheel</kbd>
+                </div>
+                <div className="keybind-row">
+                  <span className="keybind-action">Page Navigation Back</span>
+                  <kbd className="keybind-key">Mouse Thumb 1 (Back)</kbd>
+                </div>
+                <div className="keybind-row">
+                  <span className="keybind-action">Page Navigation Forward</span>
+                  <kbd className="keybind-key">Mouse Thumb 2 (Forward)</kbd>
+                </div>
+              </div>
             </div>
 
             <div className="settings-section" style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.01)', boxShadow: 'none', padding: '12px' }}>

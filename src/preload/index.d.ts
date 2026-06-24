@@ -7,6 +7,8 @@ interface MusicAPI {
   loadSettings: () => Promise<Record<string, unknown>>
   saveSettings: (settings: Record<string, unknown>) => Promise<boolean>
   getCoverArt: (filePath: string) => Promise<string | null>
+  selectFiles: () => Promise<string[] | null>
+  importFiles: (filePaths: string[]) => Promise<TrackMeta[]>
 }
 
 interface TrackMeta {

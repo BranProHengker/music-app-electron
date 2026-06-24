@@ -1113,3 +1113,35 @@ button {
   text-overflow: ellipsis;
   border: 1px solid rgba(212, 168, 67, 0.1);
 }
+
+.keybinds-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.keybind-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-input);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.keybind-action {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.keybind-key {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: rgba(212, 168, 67, 0.1);
+  color: var(--accent);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(212, 168, 67, 0.2);
+}
