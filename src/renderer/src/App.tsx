@@ -33,7 +33,9 @@ export default function App(): React.JSX.Element {
     nextTrack,
     prevTrack,
     toggleShuffle,
-    togglePlay
+    togglePlay,
+    toggleRepeat,
+    isShuffle
   } = useAudioEngine()
 
   // ─── State ──────────────────────────────────────────────────────────
@@ -131,7 +133,16 @@ export default function App(): React.JSX.Element {
       if (e.key === ' ' || e.key === 'Spacebar') {
         if (!isInput) {
           e.preventDefault()
-          togglePlay()
+          if (currentTrack) {
+            togglePlay()
+          } else if (displayedTracks && displayedTracks.length > 0) {
+            if (isShuffle) {
+              const randomIndex = Math.floor(Math.random() * displayedTracks.length)
+              playTrack(displayedTracks[randomIndex], displayedTracks)
+            } else {
+              playTrack(displayedTracks[0], displayedTracks)
+            }
+          }
         }
       }
 
@@ -149,6 +160,9 @@ export default function App(): React.JSX.Element {
           e.preventDefault()
           searchInputRef.current?.focus()
           searchInputRef.current?.select()
+        } else if (e.key === 'l' || e.key === 'L') {
+          e.preventDefault()
+          toggleRepeat()
         }
       }
     }
@@ -174,7 +188,7 @@ export default function App(): React.JSX.Element {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('wheel', handleWheel)
     }
-  }, [historyIndex, history, volume, changeVolume, nextTrack, prevTrack, toggleShuffle, togglePlay])
+  }, [historyIndex, history, volume, changeVolume, nextTrack, prevTrack, toggleShuffle, togglePlay, toggleRepeat, isShuffle])
 
   // ─── Load Library and Settings ──────────────────────────────────────
   useEffect(() => {
@@ -507,6 +521,10 @@ export default function App(): React.JSX.Element {
                   <span className="keybind-action">Page Navigation Forward</span>
                   <kbd className="keybind-key">Mouse Thumb 2 (Forward)</kbd>
                 </div>
+                <div className="keybind-row">
+                  <span className="keybind-action">Toggle Repeat (Loop) Mode</span>
+                  <kbd className="keybind-key">Ctrl + L</kbd>
+                </div>
               </div>
             </div>
 
@@ -613,7 +631,7 @@ export default function App(): React.JSX.Element {
       </main>
 
       {/* Bottom fixed Player Control Bar */}
-      <PlayerBar />
+      <PlayerBar displayedTracks={displayedTracks} />
     </div>
   )
 }

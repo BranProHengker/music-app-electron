@@ -18,9 +18,10 @@ import { TrackMeta } from '../context/AudioContext'
 interface PlayerBarProps {
   onToggleQueue?: () => void
   isQueueOpen?: boolean
+  displayedTracks?: TrackMeta[]
 }
 
-export default function PlayerBar({ onToggleQueue, isQueueOpen }: PlayerBarProps) {
+export default function PlayerBar({ onToggleQueue, isQueueOpen, displayedTracks }: PlayerBarProps) {
   const {
     currentTrack,
     isPlaying,
@@ -31,6 +32,7 @@ export default function PlayerBar({ onToggleQueue, isQueueOpen }: PlayerBarProps
     isShuffle,
     isRepeat,
     togglePlay,
+    playTrack,
     nextTrack,
     prevTrack,
     seek,
@@ -42,6 +44,19 @@ export default function PlayerBar({ onToggleQueue, isQueueOpen }: PlayerBarProps
 
   const [isDragging, setIsDragging] = useState(false)
   const [dragTime, setDragTime] = useState(0)
+
+  const handlePlayClick = () => {
+    if (currentTrack) {
+      togglePlay()
+    } else if (displayedTracks && displayedTracks.length > 0) {
+      if (isShuffle) {
+        const randomIndex = Math.floor(Math.random() * displayedTracks.length)
+        playTrack(displayedTracks[randomIndex], displayedTracks)
+      } else {
+        playTrack(displayedTracks[0], displayedTracks)
+      }
+    }
+  }
 
   // Format time (e.g. 182s -> 3:02)
   const formatTime = (secs: number) => {
@@ -203,7 +218,7 @@ export default function PlayerBar({ onToggleQueue, isQueueOpen }: PlayerBarProps
             <SkipBack size={20} weight="light" />
           </button>
 
-          <button className="btn-play-pause" onClick={togglePlay} title={isPlaying ? 'Pause' : 'Play'}>
+          <button className="btn-play-pause" onClick={handlePlayClick} title={isPlaying ? 'Pause' : 'Play'}>
             {isPlaying ? <Pause size={20} weight="fill" /> : <Play size={20} weight="fill" />}
           </button>
 

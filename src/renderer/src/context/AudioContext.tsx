@@ -66,6 +66,12 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const rafRef = useRef<number | null>(null)
+  const handleSongEndedRef = useRef<() => void>(() => {})
+
+  // Keep handleSongEndedRef updated with the latest handler on every render
+  useEffect(() => {
+    handleSongEndedRef.current = handleSongEnded
+  })
 
   // Initialize Audio
   useEffect(() => {
@@ -77,7 +83,7 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     const onPause = () => setIsPlaying(false)
     const onDurationChange = () => setDuration(audio.duration || 0)
     const onEnded = () => {
-      handleSongEnded()
+      handleSongEndedRef.current()
     }
 
     audio.addEventListener('play', onPlay)

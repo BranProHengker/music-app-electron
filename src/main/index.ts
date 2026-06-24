@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, dialog, protocol } from 'electron'
 import { join } from 'path'
-import { readFile, writeFile } from 'fs/promises'
+import { readFile, writeFile, readdir } from 'fs/promises'
 import { existsSync, createReadStream, statSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/iconapp.png?asset'
@@ -198,16 +198,19 @@ app.whenReady().then(async () => {
   // ─── IPC: Scan Folder ────────────────────────────────────────────
   ipcMain.handle('scan-folder', async (_event, folderPath: string) => {
     try {
-      const fg = await import('fast-glob')
-      const files = await fg.default(
-        ['**/*.mp3', '**/*.flac', '**/*.wav', '**/*.m4a', '**/*.ogg', '**/*.aac', '**/*.wma'],
-        {
-          cwd: folderPath,
-          absolute: true,
-          onlyFiles: true,
-          followSymbolicLinks: true
-        }
-      )
+      const relativePaths = await readdir(folderPath, { recursive: true })
+      const audioExtensions = ['.mp3', '.flac', '.wav', '.m4a', '.ogg', '.aac', '.wma']
+      const files: string[] = []
+
+      for (const p of relativePaths) {
+        const absPath = join(folderPath, p)
+        try {
+          const stat = statSync(absPath)
+          if (stat.isFile() && audioExtensions.some(ext => p.toLowerCase().endsWith(ext))) {
+            files.push(absPath)
+          }
+        } catch {}
+      }
 
       const tracks: TrackMeta[] = []
       const { parseFile } = await import('music-metadata')

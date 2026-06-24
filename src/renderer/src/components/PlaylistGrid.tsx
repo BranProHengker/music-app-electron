@@ -121,7 +121,7 @@ export default function PlaylistGrid({
             Albums
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '16px' }}>
-            {albums.slice(1, 7).map((album) => (
+            {albums.slice(1).map((album) => (
               <div
                 key={album.name}
                 className="double-bezel-card playlist-card-standard"
