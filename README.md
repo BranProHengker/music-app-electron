@@ -11,7 +11,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-171717?style=flat-square&labelColor=0d0d0f" alt="Platforms" />
-  <img src="https://img.shields.io/badge/version-1.0.0-FF4E2E?style=flat-square&labelColor=0d0d0f" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.0.6-FF4E2E?style=flat-square&labelColor=0d0d0f" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-8E8E93?style=flat-square&labelColor=0d0d0f" alt="License" />
   <img src="https://img.shields.io/badge/electron-v39-1a1a1f?style=flat-square&labelColor=0d0d0f" alt="Electron" />
 </p>
@@ -64,6 +64,11 @@ Choose the right installer for your operating system:
 - **Repeat All** — Loop the entire queue continuously.
 - **Repeat One** — Loop the current track indefinitely.
 
+### 🎤 Synced Lyrics
+- **Automatic Loading** — Automatically detects `.lrc` or `.txt` files placed in the same folder as your audio files.
+- **Synced Overlay** — Beautiful Apple Music-style blurred background lyrics overlay that syncs with the current playback time.
+- **Interactive** — Click on any lyric line to instantly seek to that part of the song.
+
 ### 🧭 Navigation
 - **Navigation History** — Browser-style back/forward navigation through your views.
 - **Mouse Thumb Buttons** — Use mouse thumb buttons (Button 4 / Button 5) for back/forward navigation.
@@ -87,6 +92,7 @@ Choose the right installer for your operating system:
 | Previous Track | `Ctrl + ←` |
 | Volume Up (+5%) | `Ctrl + ↑` |
 | Volume Down (-5%) | `Ctrl + ↓` |
+| Toggle Mute | `Ctrl + M` |
 | Volume Control (Scroll) | `Ctrl + Scroll Wheel` |
 | Toggle Shuffle | `Ctrl + R` |
 | Toggle Repeat (Loop) | `Ctrl + L` |
