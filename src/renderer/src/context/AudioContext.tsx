@@ -440,6 +440,115 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     })
   }
 
+  // Stable refs for media session action handlers to prevent unnecessary re-binding
+  const togglePlayRef = useRef(togglePlay)
+  const prevTrackRef = useRef(prevTrack)
+  const nextTrackRef = useRef(nextTrack)
+
+  useEffect(() => {
+    togglePlayRef.current = togglePlay
+    prevTrackRef.current = prevTrack
+    nextTrackRef.current = nextTrack
+  })
+
+  // Update MediaSession Metadata when track changes
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      if (currentTrack) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: currentTrack.title,
+          artist: currentTrack.artist,
+          album: currentTrack.album,
+          artwork: currentTrack.coverArt
+            ? [{ src: currentTrack.coverArt, sizes: '512x512', type: 'image/png' }]
+            : []
+        })
+      } else {
+        navigator.mediaSession.metadata = null
+      }
+    }
+  }, [currentTrack])
+
+  // Sync MediaSession playbackState with player state
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused'
+    }
+  }, [isPlaying])
+
+  // Bind MediaSession Action Handlers (for TWS/headset buttons & OS widgets)
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.setActionHandler('play', () => togglePlayRef.current())
+      navigator.mediaSession.setActionHandler('pause', () => togglePlayRef.current())
+      navigator.mediaSession.setActionHandler('previoustrack', () => prevTrackRef.current())
+      navigator.mediaSession.setActionHandler('nexttrack', () => nextTrackRef.current())
+    }
+    return () => {
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', null)
+        navigator.mediaSession.setActionHandler('pause', null)
+        navigator.mediaSession.setActionHandler('previoustrack', null)
+        navigator.mediaSession.setActionHandler('nexttrack', null)
+      }
+    }
+  }, [])
+
+  // Stable refs for volume controls
+  const volumeRef = useRef(volume)
+  const changeVolumeRef = useRef(changeVolume)
+  const toggleMuteRef = useRef(toggleMute)
+
+  useEffect(() => {
+    volumeRef.current = volume
+    changeVolumeRef.current = changeVolume
+    toggleMuteRef.current = toggleMute
+  })
+
+  // Listen for media key shortcuts sent from Electron Main process (TWS, Headsets, IEMs)
+  useEffect(() => {
+    const w = window as any
+    if (w.electron && w.electron.ipcRenderer) {
+      const handleMediaControl = (_event: any, action: string) => {
+        if (action === 'play-pause') {
+          togglePlayRef.current()
+        } else if (action === 'next') {
+          nextTrackRef.current()
+        } else if (action === 'prev') {
+          prevTrackRef.current()
+        }
+      }
+
+      w.electron.ipcRenderer.on('media-control', handleMediaControl)
+      return () => {
+        w.electron.ipcRenderer.removeAllListeners('media-control')
+      }
+    }
+    return
+  }, [])
+
+  // Listen for volume controls sent from System Tray
+  useEffect(() => {
+    const w = window as any
+    if (w.electron && w.electron.ipcRenderer) {
+      const handleVolumeControl = (_event: any, action: string) => {
+        if (action === 'up') {
+          changeVolumeRef.current(Math.min(1, volumeRef.current + 0.05))
+        } else if (action === 'down') {
+          changeVolumeRef.current(Math.max(0, volumeRef.current - 0.05))
+        } else if (action === 'mute') {
+          toggleMuteRef.current()
+        }
+      }
+
+      w.electron.ipcRenderer.on('volume-control', handleVolumeControl)
+      return () => {
+        w.electron.ipcRenderer.removeAllListeners('volume-control')
+      }
+    }
+    return
+  }, [])
+
   return (
     <AudioContext.Provider
       value={{

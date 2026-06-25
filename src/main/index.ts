@@ -1,9 +1,8 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, protocol } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, protocol, globalShortcut, Tray, Menu } from 'electron'
 import { join } from 'path'
 import { readFile, writeFile, readdir } from 'fs/promises'
 import { existsSync, createReadStream, statSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/iconapp.png?asset'
 
 // ─── Types ───────────────────────────────────────────────────────────
 export interface TrackMeta {
@@ -70,9 +69,13 @@ async function loadSettings(): Promise<Record<string, unknown>> {
   }
 }
 
+let mainWindow: BrowserWindow | null = null
+let tray: Tray | null = null
+let isQuitting = false
+
 // ─── Window Creation ─────────────────────────────────────────────────
 function createWindow(): void {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 900,
@@ -86,7 +89,7 @@ function createWindow(): void {
       symbolColor: '#a0a0a0',
       height: 36
     },
-    ...(process.platform === 'linux' ? { icon } : {}),
+    icon: join(__dirname, '../../resources/iconapp.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
@@ -94,7 +97,7 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+    mainWindow?.show()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -108,11 +111,107 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault()
+      mainWindow?.hide()
+    }
+  })
+
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
 }
+
+function createTray(): void {
+  const iconPath = join(__dirname, '../../resources/iconapp.png')
+  tray = new Tray(iconPath)
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Show/Hide Bonkey Music',
+      click: () => {
+        if (mainWindow) {
+          if (mainWindow.isVisible()) {
+            mainWindow.hide()
+          } else {
+            mainWindow.show()
+            mainWindow.focus()
+          }
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Play / Pause',
+      click: () => {
+        if (mainWindow) mainWindow.webContents.send('media-control', 'play-pause')
+      }
+    },
+    {
+      label: 'Next Track',
+      click: () => {
+        if (mainWindow) mainWindow.webContents.send('media-control', 'next')
+      }
+    },
+    {
+      label: 'Previous Track',
+      click: () => {
+        if (mainWindow) mainWindow.webContents.send('media-control', 'prev')
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Volume Up (+5%)',
+      click: () => {
+        if (mainWindow) mainWindow.webContents.send('volume-control', 'up')
+      }
+    },
+    {
+      label: 'Volume Down (-5%)',
+      click: () => {
+        if (mainWindow) mainWindow.webContents.send('volume-control', 'down')
+      }
+    },
+    {
+      label: 'Toggle Mute',
+      click: () => {
+        if (mainWindow) mainWindow.webContents.send('volume-control', 'mute')
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => {
+        isQuitting = true
+        app.quit()
+      }
+    }
+  ])
+
+  tray.setToolTip('Bonkey Music')
+  tray.setContextMenu(contextMenu)
+
+  tray.on('double-click', () => {
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide()
+      } else {
+        mainWindow.show()
+        mainWindow.focus()
+      }
+    }
+  })
+}
+
+// Disable hardware video decoding features to suppress GPU VAAPI warnings in terminal
+app.commandLine.appendSwitch('disable-accelerated-video-decode')
+app.commandLine.appendSwitch('disable-gpu-memory-buffer-video-frames')
 
 // ─── App Lifecycle ───────────────────────────────────────────────────
 app.whenReady().then(async () => {
-  electronApp.setAppUserModelId('com.music-app')
+  electronApp.setAppUserModelId('com.bonkeymusic.app')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
@@ -309,7 +408,27 @@ app.whenReady().then(async () => {
       return null
     }
   })
+  // ─── IPC: Get Lyrics ─────────────────────────────────────────────
+  ipcMain.handle('get-lyrics', async (_event, audioFilePath: string) => {
+    console.log('[Main IPC] get-lyrics requested for:', audioFilePath)
+    try {
+      // Replace audio extension with .lrc or .txt
+      const baseName = audioFilePath.replace(/\.[^.]+$/, '')
+      const lrcPath = baseName + '.lrc'
+      const txtPath = baseName + '.txt'
+      console.log('[Main IPC] Checking lrcPath:', lrcPath, 'exists:', existsSync(lrcPath))
 
+      if (existsSync(lrcPath)) {
+        return await readFile(lrcPath, 'utf-8')
+      } else if (existsSync(txtPath)) {
+        return await readFile(txtPath, 'utf-8')
+      }
+      return null
+    } catch (err) {
+      console.warn('Failed to load lyrics file:', err)
+      return null
+    }
+  })
   // ─── IPC: Select Files ───────────────────────────────────────────
   ipcMain.handle('select-files', async () => {
     const result = await dialog.showOpenDialog({
@@ -385,6 +504,24 @@ app.whenReady().then(async () => {
   })
 
   createWindow()
+  createTray()
+
+  // Register global media shortcuts for IEM/TWS headset controls and media keyboards
+  const registerShortcut = (keys: string[], action: string) => {
+    keys.forEach(key => {
+      try {
+        globalShortcut.register(key, () => {
+          if (mainWindow) mainWindow.webContents.send('media-control', action)
+        })
+      } catch (e) {
+        // Silently catch registration errors if OS has blocked/hijacked a specific key
+      }
+    })
+  }
+
+  registerShortcut(['MediaPlayPause', 'XF86AudioPlay'], 'play-pause')
+  registerShortcut(['MediaNextTrack', 'XF86AudioNext'], 'next')
+  registerShortcut(['MediaPreviousTrack', 'XF86AudioPrev'], 'prev')
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -395,4 +532,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
 })

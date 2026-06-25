@@ -10,7 +10,8 @@ import {
   SpeakerLow,
   SpeakerX,
   MusicNotes,
-  List
+  List,
+  ChatTeardropText
 } from '@phosphor-icons/react'
 import { useAudioEngine } from '../hooks/useAudioEngine'
 import { TrackMeta } from '../context/AudioContext'
@@ -18,10 +19,18 @@ import { TrackMeta } from '../context/AudioContext'
 interface PlayerBarProps {
   onToggleQueue?: () => void
   isQueueOpen?: boolean
+  onToggleLyrics?: () => void
+  isLyricsOpen?: boolean
   displayedTracks?: TrackMeta[]
 }
 
-export default function PlayerBar({ onToggleQueue, isQueueOpen, displayedTracks }: PlayerBarProps) {
+export default function PlayerBar({
+  onToggleQueue,
+  isQueueOpen,
+  onToggleLyrics,
+  isLyricsOpen,
+  displayedTracks
+}: PlayerBarProps) {
   const {
     currentTrack,
     isPlaying,
@@ -257,6 +266,16 @@ export default function PlayerBar({ onToggleQueue, isQueueOpen, displayedTracks 
         >
           <Repeat size={18} weight="light" />
         </button>
+
+        {onToggleLyrics && (
+          <button
+            className={`btn-control ${isLyricsOpen ? 'active' : ''}`}
+            onClick={onToggleLyrics}
+            title="Lyrics"
+          >
+            <ChatTeardropText size={20} weight="light" />
+          </button>
+        )}
 
         {onToggleQueue && (
           <button

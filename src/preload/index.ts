@@ -11,6 +11,8 @@ const musicAPI = {
     ipcRenderer.invoke('save-settings', settings),
   getCoverArt: (filePath: string): Promise<string | null> =>
     ipcRenderer.invoke('get-cover-art', filePath),
+  getLyrics: (audioFilePath: string): Promise<string | null> =>
+    ipcRenderer.invoke('get-lyrics', audioFilePath),
   selectFiles: (): Promise<string[] | null> => ipcRenderer.invoke('select-files'),
   importFiles: (filePaths: string[]): Promise<unknown[]> => ipcRenderer.invoke('import-files', filePaths)
 }

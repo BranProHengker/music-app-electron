@@ -15,6 +15,7 @@ import TrackList from './components/TrackList'
 import PlaylistGrid from './components/PlaylistGrid'
 import PlayerBar from './components/PlayerBar'
 import QueuePanel from './components/QueuePanel'
+import LyricsView from './components/LyricsView'
 import { useAudioEngine, TrackMeta } from './hooks/useAudioEngine'
 
 interface AlbumGroup {
@@ -42,12 +43,17 @@ export default function App(): React.JSX.Element {
     addToQueue,
     removeFromQueue,
     clearQueue,
-    shuffleQueue
+    shuffleQueue,
+    currentTime,
+    duration,
+    seek,
+    toggleMute
   } = useAudioEngine()
 
   // ─── State ──────────────────────────────────────────────────────────
   const [currentView, setCurrentView] = useState<'library' | 'favorites' | 'settings'>('library')
   const [isQueueOpen, setIsQueueOpen] = useState(false)
+  const [isLyricsOpen, setIsLyricsOpen] = useState(false)
   const [libraryFolder, setLibraryFolder] = useState<string | null>(null)
   const [tracks, setTracks] = useState<TrackMeta[]>([])
   const [favorites, setFavorites] = useState<string[]>([])
@@ -154,6 +160,33 @@ export default function App(): React.JSX.Element {
         }
       }
 
+      // Handle Hardware Media Keys directly from Headset/IEM/TWS or Keyboard
+      const mediaKey = e.key.toLowerCase()
+      console.log('Bonkey Music - Key pressed:', e.key, 'code:', e.code)
+
+      if (
+        mediaKey === 'mediaplaypause' ||
+        mediaKey === 'audioplay' ||
+        mediaKey === 'audiopause'
+      ) {
+        e.preventDefault()
+        togglePlay()
+      } else if (
+        mediaKey === 'mediatracknext' ||
+        mediaKey === 'audionext' ||
+        mediaKey === 'next'
+      ) {
+        e.preventDefault()
+        nextTrack()
+      } else if (
+        mediaKey === 'mediatrackprevious' ||
+        mediaKey === 'audioprev' ||
+        mediaKey === 'prev'
+      ) {
+        e.preventDefault()
+        prevTrack()
+      }
+
       if (e.ctrlKey) {
         if (e.key === 'ArrowRight') {
           e.preventDefault()
@@ -180,6 +213,20 @@ export default function App(): React.JSX.Element {
         } else if (e.key === 'q' || e.key === 'Q') {
           e.preventDefault()
           setIsQueueOpen((prev) => !prev)
+        } else if (e.key === 'm' || e.key === 'M') {
+          e.preventDefault()
+          toggleMute()
+        }
+      }
+
+      // Skip timeline by 5 seconds (Shift + Arrow Left/Right)
+      if (e.shiftKey && !e.ctrlKey) {
+        if (e.key === 'ArrowRight') {
+          e.preventDefault()
+          seek(Math.min(duration, currentTime + 5))
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault()
+          seek(Math.max(0, currentTime - 5))
         }
       }
     }
@@ -205,7 +252,7 @@ export default function App(): React.JSX.Element {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('wheel', handleWheel)
     }
-  }, [historyIndex, history, volume, changeVolume, nextTrack, prevTrack, toggleShuffle, togglePlay, toggleRepeat, isShuffle, setIsQueueOpen])
+  }, [historyIndex, history, volume, changeVolume, nextTrack, prevTrack, toggleShuffle, togglePlay, toggleRepeat, isShuffle, setIsQueueOpen, currentTime, duration, seek, toggleMute])
 
   // ─── Load Library and Settings ──────────────────────────────────────
   useEffect(() => {
@@ -557,6 +604,14 @@ export default function App(): React.JSX.Element {
                   <span className="keybind-action">Toggle Play Queue</span>
                   <kbd className="keybind-key">Ctrl + Q</kbd>
                 </div>
+                <div className="keybind-row">
+                  <span className="keybind-action">Skip Forward/Backward 5s</span>
+                  <kbd className="keybind-key">Shift + Right/Left Arrow</kbd>
+                </div>
+                <div className="keybind-row">
+                  <span className="keybind-action">Mute / Unmute Audio</span>
+                  <kbd className="keybind-key">Ctrl + M</kbd>
+                </div>
               </div>
             </div>
 
@@ -681,10 +736,22 @@ export default function App(): React.JSX.Element {
         queue={queue}
       />
 
+      {/* Synced Lyrics Panel */}
+      {isLyricsOpen && (
+        <LyricsView
+          currentTrack={currentTrack}
+          currentTime={currentTime}
+          seek={seek}
+          onClose={() => setIsLyricsOpen(false)}
+        />
+      )}
+
       {/* Bottom fixed Player Control Bar */}
       <PlayerBar
         onToggleQueue={() => setIsQueueOpen((prev) => !prev)}
         isQueueOpen={isQueueOpen}
+        onToggleLyrics={() => setIsLyricsOpen((prev) => !prev)}
+        isLyricsOpen={isLyricsOpen}
         displayedTracks={displayedTracks}
       />
     </div>
