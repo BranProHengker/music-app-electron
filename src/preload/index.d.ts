@@ -10,6 +10,7 @@ interface MusicAPI {
   getLyrics: (audioFilePath: string) => Promise<string | null>
   selectFiles: () => Promise<string[] | null>
   importFiles: (filePaths: string[]) => Promise<TrackMeta[]>
+  updateDiscordStatus: (songData: any) => void
 }
 
 interface TrackMeta {

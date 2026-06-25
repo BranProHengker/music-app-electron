@@ -11,7 +11,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-171717?style=flat-square&labelColor=0d0d0f" alt="Platforms" />
-  <img src="https://img.shields.io/badge/version-1.1.1-FF4E2E?style=flat-square&labelColor=0d0d0f" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.2.5-FF4E2E?style=flat-square&labelColor=0d0d0f" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-8E8E93?style=flat-square&labelColor=0d0d0f" alt="License" />
   <img src="https://img.shields.io/badge/electron-v39-1a1a1f?style=flat-square&labelColor=0d0d0f" alt="Electron" />
 </p>
@@ -50,6 +50,10 @@ Choose the right installer for your operating system:
 - **Favorites / Liked Songs** — Heart any track to add it to your favorites collection for quick access.
 - **Real-time Search** — Instantly filter tracks by title, artist, or album name with `Ctrl + F` focus shortcut.
 - **Column Sorting** — Sort tracks by title, artist, album, genre, or duration in ascending/descending order.
+
+### 🎮 Discord Rich Presence (RPC)
+- **Active Status Sync** — Displays what you are listening to on your Discord profile in real-time.
+- **Dynamic Track Details** — Shows the song name, artist name, and a real-time progress bar/duration synced with the playback time.
 
 ### 🔀 Play Queue
 - **Queue Panel** — Dedicated side panel showing the current playback queue, toggled with `Ctrl + Q`.

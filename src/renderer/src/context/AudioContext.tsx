@@ -555,6 +555,43 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     return
   }, [])
 
+  // Synchronize playback state with Discord RPC (throttled to avoid rate-limiting)
+  const lastSentTimeRef = useRef(0)
+  const lastSentRealTimeRef = useRef(0)
+  const lastIsPlayingRef = useRef(false)
+  const lastTrackPathRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const w = window as any
+    if (w.api && w.api.updateDiscordStatus) {
+      const now = Date.now()
+      const realTimeElapsed = lastSentRealTimeRef.current ? (now - lastSentRealTimeRef.current) / 1000 : 0
+      const progressDelta = currentTime - lastSentTimeRef.current
+      const drift = Math.abs(progressDelta - realTimeElapsed)
+
+      const isPlayingChanged = isPlaying !== lastIsPlayingRef.current
+      const trackChanged = (currentTrack?.filePath || null) !== lastTrackPathRef.current
+      
+      // A manual seek is detected if the playback position jumps by more than 2 seconds relative to actual clock time
+      const seeked = lastSentRealTimeRef.current && isPlaying && drift > 2.0
+
+      if (isPlayingChanged || trackChanged || seeked || currentTime === 0) {
+        lastSentTimeRef.current = currentTime
+        lastSentRealTimeRef.current = now
+        lastIsPlayingRef.current = isPlaying
+        lastTrackPathRef.current = currentTrack?.filePath || null
+
+        w.api.updateDiscordStatus({
+          title: currentTrack?.title || null,
+          artist: currentTrack?.artist || null,
+          duration: duration,
+          currentTime: currentTime,
+          isPlaying: isPlaying && currentTrack !== null
+        })
+      }
+    }
+  }, [currentTrack, isPlaying, currentTime, duration])
+
   return (
     <AudioContext.Provider
       value={{

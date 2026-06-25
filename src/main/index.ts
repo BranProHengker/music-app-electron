@@ -13,6 +13,7 @@ import { join } from 'path'
 import { readFile, writeFile, readdir } from 'fs/promises'
 import { existsSync, createReadStream, statSync } from 'fs'
 import { electronApp, is } from '@electron-toolkit/utils'
+import DiscordRPC from 'discord-rpc'
 
 // ─── Types ───────────────────────────────────────────────────────────
 export interface TrackMeta {
@@ -600,10 +601,114 @@ app.whenReady().then(async () => {
   registerShortcut(['MediaNextTrack', 'XF86AudioNext'], 'next')
   registerShortcut(['MediaPreviousTrack', 'XF86AudioPrev'], 'prev')
 
+  // ─── Discord Rich Presence ──────────────────────────────────────────
+  const clientId = '1519697840094580757' // Reverted to the exact ID copied by the user
+  let isRpcConnected = false
+  let lastConnectAttempt = 0
+
+  function connectDiscord() {
+    if (isRpcConnected) return
+    const now = Date.now()
+    // Throttle connection attempts to once every 15 seconds to avoid spamming the console
+    if (now - lastConnectAttempt < 15000) return
+    lastConnectAttempt = now
+
+    try {
+      rpcClient = new DiscordRPC.Client({ transport: 'ipc' })
+      
+      rpcClient.on('ready', () => {
+        console.log('[Discord RPC] Connected to Discord successfully!')
+        isRpcConnected = true
+      })
+
+      // Support Linux Snap and Flatpak Discord installations by temporarily overriding XDG_RUNTIME_DIR
+      const oldXdg = process.env.XDG_RUNTIME_DIR
+      const uid = process.getuid ? process.getuid() : 1000
+      const snapDir = `/run/user/${uid}/snap.discord`
+      const flatpakDir = `/run/user/${uid}/.flatpak/com.discordapp.Discord/xdg-run`
+
+      if (process.platform === 'linux') {
+        if (existsSync(join(snapDir, 'discord-ipc-0'))) {
+          process.env.XDG_RUNTIME_DIR = snapDir
+        } else if (existsSync(join(flatpakDir, 'discord-ipc-0'))) {
+          process.env.XDG_RUNTIME_DIR = flatpakDir
+        }
+      }
+
+      rpcClient.login({ clientId }).catch((err) => {
+        console.warn('[Discord RPC] Connection failed:', err.message)
+        isRpcConnected = false
+      }).finally(() => {
+        // Restore original environment variable
+        if (process.platform === 'linux') {
+          if (oldXdg) {
+            process.env.XDG_RUNTIME_DIR = oldXdg
+          } else {
+            delete process.env.XDG_RUNTIME_DIR
+          }
+        }
+      })
+    } catch (e) {
+      console.warn('[Discord RPC] Library initialization failed:', e)
+    }
+  }
+
+  // Attempt initial connection
+  connectDiscord()
+
+  ipcMain.on('update-discord-status', (_event, songData: any) => {
+    console.log('[Discord RPC] update-discord-status triggered. isRpcConnected:', isRpcConnected, 'songData:', songData)
+    if (!rpcClient) {
+      console.log('[Discord RPC] No rpcClient initialized')
+      return
+    }
+
+    if (!isRpcConnected) {
+      console.log('[Discord RPC] Client not connected. Attempting connection...')
+      connectDiscord()
+      return
+    }
+
+    try {
+      if (!songData || !songData.isPlaying || !songData.title) {
+        console.log('[Discord RPC] Clearing activity (not playing or no title)')
+        rpcClient.clearActivity().catch(() => {})
+        return
+      }
+
+      // Calculate timestamps
+      const startTimestamp = Date.now() - (songData.currentTime * 1000)
+      const endTimestamp = startTimestamp + (songData.duration * 1000)
+
+      const activityPayload = {
+        details: songData.title,
+        state: `by ${songData.artist}`,
+        startTimestamp: Math.floor(startTimestamp / 1000),
+        endTimestamp: Math.floor(endTimestamp / 1000),
+        largeImageKey: 'logo_app',
+        largeImageText: 'Bonkey Music',
+        instance: false
+      }
+
+      console.log('[Discord RPC] Setting activity payload:', activityPayload)
+      rpcClient.setActivity(activityPayload)
+        .then(() => {
+          console.log('[Discord RPC] setActivity resolved successfully')
+        })
+        .catch((err) => {
+          console.warn('[Discord RPC] Failed to set activity:', err)
+        })
+    } catch (err) {
+      console.error('[Discord RPC] Error in activity update:', err)
+    }
+  })
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
+
+let rpcClient: any = null
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -613,4 +718,9 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll()
+  if (rpcClient) {
+    try {
+      rpcClient.destroy()
+    } catch {}
+  }
 })
