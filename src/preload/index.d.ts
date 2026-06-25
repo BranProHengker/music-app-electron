@@ -11,6 +11,7 @@ interface MusicAPI {
   selectFiles: () => Promise<string[] | null>
   importFiles: (filePaths: string[]) => Promise<TrackMeta[]>
   updateDiscordStatus: (songData: any) => void
+  resetLibrary: () => Promise<TrackMeta[]>
 }
 
 interface TrackMeta {

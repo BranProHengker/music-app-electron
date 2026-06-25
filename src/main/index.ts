@@ -283,9 +283,14 @@ app.whenReady().then(async () => {
       }
       filePath = decodeURIComponent(filePath)
 
-      // Remove leading slash on Windows (e.g., /c:/Users/... -> c:/Users/...)
-      if (filePath.startsWith('/') && /^\/[a-zA-Z]:/.test(filePath)) {
+      // Strip leading slash on Windows if present (e.g., /c:/Users... -> c:/Users... or /c/Users... -> c/Users...)
+      if (filePath.startsWith('/') && /^\/[a-zA-Z](:?)\//.test(filePath)) {
         filePath = filePath.slice(1)
+      }
+
+      // Restore colon for Windows drive letters if it was stripped by URL normalization (e.g., c/Users/... -> c:/Users/...)
+      if (/^[a-zA-Z]\//.test(filePath)) {
+        filePath = filePath[0] + ':' + filePath.slice(1)
       }
 
       // On Unix, ensure the path has a leading slash
@@ -448,6 +453,22 @@ app.whenReady().then(async () => {
   // ─── IPC: Load Library ───────────────────────────────────────────
   ipcMain.handle('load-library', async () => {
     return await loadLibrary()
+  })
+
+  // ─── IPC: Reset Library ──────────────────────────────────────────
+  ipcMain.handle('reset-library', async () => {
+    try {
+      await saveLibrary([])
+      const settings = await loadSettings()
+      delete settings.lastPlayedTrack
+      delete settings.lastPlayedTime
+      delete settings.libraryFolder
+      await saveSettings(settings)
+      return []
+    } catch (error) {
+      console.error('Reset library error:', error)
+      return []
+    }
   })
 
   // ─── IPC: Load Settings ──────────────────────────────────────────
@@ -678,13 +699,11 @@ app.whenReady().then(async () => {
 
       // Calculate timestamps
       const startTimestamp = Date.now() - (songData.currentTime * 1000)
-      const endTimestamp = startTimestamp + (songData.duration * 1000)
 
       const activityPayload = {
         details: songData.title,
         state: `by ${songData.artist}`,
         startTimestamp: Math.floor(startTimestamp / 1000),
-        endTimestamp: Math.floor(endTimestamp / 1000),
         largeImageKey: 'logo_app',
         largeImageText: 'Bonkey Music',
         instance: false

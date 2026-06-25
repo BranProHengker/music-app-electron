@@ -333,6 +333,27 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  const handleResetLibrary = async () => {
+    const confirmReset = window.confirm('Are you sure you want to reset your library? This will clear all cached tracks from the app.')
+    if (!confirmReset) return
+
+    setIsScanning(true)
+    try {
+      // Clear playback and queue first for instant visual response
+      clearQueue()
+      const clearedTracks = await window.api.resetLibrary()
+      setTracks(clearedTracks)
+      setLibraryFolder(null)
+    } catch (err) {
+      console.error('Failed to reset library:', err)
+      // Fallback: clear the UI tracks anyway
+      setTracks([])
+      setLibraryFolder(null)
+    } finally {
+      setIsScanning(false)
+    }
+  }
+
   // ─── Playlists Management ──────────────────────────────────────────
   const handleCreatePlaylist = async () => {
     const name = prompt('Enter playlist name:')
@@ -499,19 +520,6 @@ export default function App(): React.JSX.Element {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-
-          {libraryFolder && (
-            <button
-              className="btn-secondary"
-              onClick={() => handleScanFolder(libraryFolder)}
-              disabled={isScanning}
-            >
-              <span>{isScanning ? 'Syncing...' : 'Sync Folder'}</span>
-              <div className="btn-icon-circle">
-                <ArrowClockwise size={14} weight="light" className={isScanning ? 'animate-spin' : ''} />
-              </div>
-            </button>
-          )}
         </div>
 
         {/* View Routing */}
@@ -548,17 +556,32 @@ export default function App(): React.JSX.Element {
               {libraryFolder && (
                 <div className="settings-row">
                   <div className="settings-label">
-                    <span className="settings-title">Recompile Metadata Cache</span>
-                    <span className="settings-subtitle">Scans library for new tracks and updates metadata tags</span>
+                    <span className="settings-title">Sync Your Songs</span>
+                    <span className="settings-subtitle">Scans your library folder for new tracks and compiles metadata tags</span>
                   </div>
                   <button className="btn-secondary" onClick={() => handleScanFolder(libraryFolder)} disabled={isScanning}>
-                    <span>{isScanning ? 'Scanning...' : 'Rescan Library'}</span>
+                    <span>{isScanning ? 'Syncing...' : 'Sync Your Songs'}</span>
                     <div className="btn-icon-circle">
-                      <ArrowClockwise size={14} weight="light" />
+                      <ArrowClockwise size={14} weight="light" className={isScanning ? 'animate-spin' : ''} />
                     </div>
                   </button>
                 </div>
               )}
+
+              <div className="settings-row" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px' }}>
+                <div className="settings-label">
+                  <span className="settings-title" style={{ color: '#FF4E2E' }}>Reset Music Library</span>
+                  <span className="settings-subtitle">Remove all indexed songs from your library cache. This will not delete your files.</span>
+                </div>
+                <button 
+                  className="btn-secondary" 
+                  style={{ borderColor: 'rgba(255,78,46,0.2)', color: '#FF4E2E' }}
+                  onClick={handleResetLibrary}
+                  disabled={isScanning}
+                >
+                  <span>Reset Library</span>
+                </button>
+              </div>
             </div>
 
             <h2 className="section-title" style={{ marginTop: '8px', marginBottom: '0' }}>Keyboard Shortcuts (Keybinds)</h2>
@@ -671,9 +694,6 @@ export default function App(): React.JSX.Element {
                 onSelectAlbum={(name) => setActiveAlbum(name)}
                 onSelectFavorites={() => setCurrentView('favorites')}
                 onSelectAllSongs={() => setSearchQuery(' ')} // triggers displaying list view with space filter (resets to lists)
-                libraryFolder={libraryFolder}
-                onScanFolder={() => libraryFolder && handleScanFolder(libraryFolder)}
-                isScanning={isScanning}
               />
             )}
 

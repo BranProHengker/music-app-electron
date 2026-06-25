@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Heart, MusicNotes, Sparkle, Disc, Users, Clock, Play, Pause, ArrowClockwise } from '@phosphor-icons/react'
+import { Heart, MusicNotes, Sparkle, Disc, Users, Clock, Play, Pause } from '@phosphor-icons/react'
 import { TrackMeta } from '../hooks/useAudioEngine'
 import { useAudioEngine } from '../hooks/useAudioEngine'
 
@@ -18,9 +18,6 @@ interface PlaylistGridProps {
   onSelectAlbum: (albumName: string | null) => void
   onSelectFavorites: () => void
   onSelectAllSongs: () => void
-  libraryFolder: string | null
-  onScanFolder: () => void
-  isScanning: boolean
 }
 
 export default function PlaylistGrid({
@@ -30,10 +27,7 @@ export default function PlaylistGrid({
   totalArtistsCount,
   onSelectAlbum,
   onSelectFavorites,
-  onSelectAllSongs,
-  libraryFolder,
-  onScanFolder,
-  isScanning
+  onSelectAllSongs
 }: PlaylistGridProps) {
   const { currentTrack, isPlaying, togglePlay } = useAudioEngine()
   const [featuredAlbum, setFeaturedAlbum] = useState<AlbumGroup | null>(null)
@@ -109,8 +103,8 @@ export default function PlaylistGrid({
           </div>
         </div>
 
-        {/* Card 3: Library Summary (Tall Bento: 1 col, 2 rows) */}
-        <div className="double-bezel-card bento-card-tall bento-card-stats" onClick={onSelectAllSongs}>
+        {/* Card 3: Library Summary (Standard Bento: 1 col, 1 row) */}
+        <div className="double-bezel-card bento-card-stats" onClick={onSelectAllSongs}>
           <div className="card-inner" style={{ padding: '24px', justifyContent: 'space-between' }}>
             <div>
               <span className="card-tag">Library Stats</span>
@@ -148,7 +142,7 @@ export default function PlaylistGrid({
           </div>
         </div>
 
-        {/* Card 4: Featured Album / Random Album (Standard Bento) */}
+        {/* Card 4: Featured Album / Random Album (Banner Bento: 4 cols) */}
         {featuredAlbum ? (
           <div className="double-bezel-card bento-card-featured" onClick={() => onSelectAlbum(featuredAlbum.name)}>
             <div className="card-inner">
@@ -168,41 +162,13 @@ export default function PlaylistGrid({
             </div>
           </div>
         ) : (
-          <div className="double-bezel-card">
+          <div className="double-bezel-card" style={{ gridColumn: 'span 4' }}>
             <div className="card-inner" style={{ padding: '20px', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
               <MusicNotes size={32} weight="light" color="var(--text-tertiary)" />
               <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px' }}>Scan a folder to compile albums</p>
             </div>
           </div>
         )}
-
-        {/* Card 5: Welcome & Quick Sync (Large Bento: 2 cols) */}
-        <div className="double-bezel-card bento-card-large bento-card-welcome">
-          <div className="card-inner" style={{ padding: '24px', justifyContent: 'space-between' }}>
-            <div className="welcome-header">
-              <span className="card-tag">System Console</span>
-              <h3 className="welcome-title">Bonkey Engine</h3>
-              <p className="welcome-desc">
-                {libraryFolder ? (
-                  <>
-                    Connected to library: <code className="folder-code">{libraryFolder.split('/').pop()}</code>
-                  </>
-                ) : (
-                  'No local library folder configured. Head to Settings to set it up.'
-                )}
-              </p>
-            </div>
-
-            <div className="welcome-actions">
-              {libraryFolder && (
-                <button className="btn-sync-quick" onClick={onScanFolder} disabled={isScanning}>
-                  <ArrowClockwise size={14} className={isScanning ? 'animate-spin' : ''} />
-                  <span>{isScanning ? 'Syncing...' : 'Sync Folder'}</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Album row grid (standard card grids) */}

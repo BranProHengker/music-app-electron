@@ -15,7 +15,8 @@ const musicAPI = {
     ipcRenderer.invoke('get-lyrics', audioFilePath),
   selectFiles: (): Promise<string[] | null> => ipcRenderer.invoke('select-files'),
   importFiles: (filePaths: string[]): Promise<unknown[]> => ipcRenderer.invoke('import-files', filePaths),
-  updateDiscordStatus: (songData: unknown): void => ipcRenderer.send('update-discord-status', songData)
+  updateDiscordStatus: (songData: unknown): void => ipcRenderer.send('update-discord-status', songData),
+  resetLibrary: (): Promise<unknown[]> => ipcRenderer.invoke('reset-library')
 }
 
 // Use contextBridge to expose APIs securely
