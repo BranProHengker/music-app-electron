@@ -12,7 +12,7 @@ import {
 import { join } from 'path'
 import { readFile, writeFile, readdir } from 'fs/promises'
 import { existsSync, createReadStream, statSync } from 'fs'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { electronApp, is } from '@electron-toolkit/utils'
 
 // ─── Types ───────────────────────────────────────────────────────────
 export interface TrackMeta {
@@ -115,14 +115,43 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // Prevent default Ctrl+R reload from resetting app state (so Shuffle shortcut works)
-  // Devs can still use Ctrl+Shift+R to force reload the app.
+  // Handle custom keyboard shortcuts (DevTools, Reload, Zoom) manually
   mainWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.type === 'keyDown' && input.code === 'KeyR' && (input.control || input.meta)) {
-      if (!input.shift) {
+    if (input.type === 'keyDown') {
+      const isControlOrMeta = input.control || input.meta
+
+      // 1. Toggle Developer Tools (F12 or Ctrl+Shift+I) in both dev and prod
+      const isF12 = input.code === 'F12'
+      const isCtrlShiftI = isControlOrMeta && input.shift && input.code === 'KeyI'
+      if (isF12 || isCtrlShiftI) {
         event.preventDefault()
-        // Send shuffle event to renderer
+        if (mainWindow?.webContents.isDevToolsOpened()) {
+          mainWindow.webContents.closeDevTools()
+        } else {
+          mainWindow?.webContents.openDevTools({ mode: 'undocked' })
+        }
+        return
+      }
+
+      // 2. Prevent default Ctrl+R or F5 reload and trigger Shuffle instead
+      const isCtrlR = isControlOrMeta && input.code === 'KeyR'
+      const isF5 = input.code === 'F5'
+      if (isCtrlR || isF5) {
+        // Devs can still hard reload using Ctrl+Shift+R in development mode
+        if (is.dev && input.shift && isCtrlR) {
+          return // Allow default reload
+        }
+        event.preventDefault()
+        // Trigger shuffle event
         mainWindow?.webContents.send('media-control', 'shuffle')
+        return
+      }
+
+      // 3. Disable default Zoom shortcuts (Ctrl+Plus, Ctrl+Minus, etc.)
+      const isZoomOut = isControlOrMeta && input.code === 'Minus'
+      const isZoomIn = isControlOrMeta && input.code === 'Equal' && input.shift
+      if (isZoomOut || isZoomIn) {
+        event.preventDefault()
       }
     }
   })
@@ -235,8 +264,9 @@ app.commandLine.appendSwitch('disable-gpu-memory-buffer-video-frames')
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.bonkeymusic.app')
 
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
+  // We handle shortcuts manually inside createWindow to prevent reload conflicts and allow F12 in production
+  app.on('browser-window-created', (_, _window) => {
+    // Custom handling inside createWindow instead of optimizer.watchWindowShortcuts
   })
 
   // ─── Register media:// protocol handler ──────────────────────────

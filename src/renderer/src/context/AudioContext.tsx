@@ -48,9 +48,11 @@ const getAudioUrl = (filePath: string): string => {
   if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
     return filePath
   }
-  // encodeURI encodes spaces/etc. but leaves ? and # alone.
-  // We manually encode ? to %3F and # to %23 so they are not treated as URL delimiters.
-  return `media://${encodeURI(filePath).replace(/\?/g, '%3F').replace(/#/g, '%23')}`
+  // Replace backslashes with forward slashes for URL compatibility (important for Windows)
+  const normalizedPath = filePath.replace(/\\/g, '/')
+  // Use 3 slashes (media:///) so the file path starts in the pathname portion, 
+  // keeping the drive letter (e.g. C:) from being treated as an invalid hostname.
+  return `media:///${encodeURI(normalizedPath).replace(/\?/g, '%3F').replace(/#/g, '%23')}`
 }
 
 export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
