@@ -444,11 +444,13 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
   const togglePlayRef = useRef(togglePlay)
   const prevTrackRef = useRef(prevTrack)
   const nextTrackRef = useRef(nextTrack)
+  const toggleShuffleRef = useRef(toggleShuffle)
 
   useEffect(() => {
     togglePlayRef.current = togglePlay
     prevTrackRef.current = prevTrack
     nextTrackRef.current = nextTrack
+    toggleShuffleRef.current = toggleShuffle
   })
 
   // Update MediaSession Metadata when track changes
@@ -516,6 +518,8 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
           nextTrackRef.current()
         } else if (action === 'prev') {
           prevTrackRef.current()
+        } else if (action === 'shuffle') {
+          toggleShuffleRef.current()
         }
       }
 

@@ -1,4 +1,14 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, protocol, globalShortcut, Tray, Menu } from 'electron'
+import {
+  app,
+  shell,
+  BrowserWindow,
+  ipcMain,
+  dialog,
+  protocol,
+  globalShortcut,
+  Tray,
+  Menu
+} from 'electron'
 import { join } from 'path'
 import { readFile, writeFile, readdir } from 'fs/promises'
 import { existsSync, createReadStream, statSync } from 'fs'
@@ -103,6 +113,18 @@ function createWindow(): void {
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
+  })
+
+  // Prevent default Ctrl+R reload from resetting app state (so Shuffle shortcut works)
+  // Devs can still use Ctrl+Shift+R to force reload the app.
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.code === 'KeyR' && (input.control || input.meta)) {
+      if (!input.shift) {
+        event.preventDefault()
+        // Send shuffle event to renderer
+        mainWindow?.webContents.send('media-control', 'shuffle')
+      }
+    }
   })
 
   // HMR for renderer based on electron-vite cli
@@ -224,7 +246,7 @@ app.whenReady().then(async () => {
       // This prevents ERR_INVALID_URL when parsing Windows paths like media://C:\Users\...
       let filePath = request.url.slice('media://'.length)
       filePath = decodeURIComponent(filePath)
-      
+
       // On Windows, the path might start with an extra slash if it was parsed strangely,
       // but with simple slice, it usually starts with C:. If it's a Unix path, we need the leading slash.
       if (!filePath.startsWith('/') && !/^[a-zA-Z]:/.test(filePath)) {
@@ -258,7 +280,7 @@ app.whenReady().then(async () => {
         const parts = range.replace(/bytes=/, '').split('-')
         const start = parseInt(parts[0], 10)
         const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1
-        const chunkSize = (end - start) + 1
+        const chunkSize = end - start + 1
 
         const stream = createReadStream(filePath, { start, end })
         // @ts-ignore: Response body accepts Node.js readable streams in Electron
@@ -309,7 +331,7 @@ app.whenReady().then(async () => {
         const absPath = join(folderPath, p)
         try {
           const stat = statSync(absPath)
-          if (stat.isFile() && audioExtensions.some(ext => p.toLowerCase().endsWith(ext))) {
+          if (stat.isFile() && audioExtensions.some((ext) => p.toLowerCase().endsWith(ext))) {
             files.push(absPath)
           }
         } catch {}
@@ -334,7 +356,13 @@ app.whenReady().then(async () => {
 
           tracks.push({
             filePath: file,
-            title: common.title || file.split('/').pop()?.replace(/\.[^.]+$/, '') || 'Unknown',
+            title:
+              common.title ||
+              file
+                .split('/')
+                .pop()
+                ?.replace(/\.[^.]+$/, '') ||
+              'Unknown',
             artist: common.artist || 'Unknown Artist',
             album: common.album || 'Unknown Album',
             duration: format.duration || 0,
@@ -451,10 +479,10 @@ app.whenReady().then(async () => {
     try {
       const { parseFile } = await import('music-metadata')
       const currentTracks = await loadLibrary()
-      
+
       const newTracks: TrackMeta[] = []
       for (const file of filePaths) {
-        if (currentTracks.some(t => t.filePath === file)) continue
+        if (currentTracks.some((t) => t.filePath === file)) continue
         try {
           const metadata = await parseFile(file)
           const common = metadata.common
@@ -469,7 +497,13 @@ app.whenReady().then(async () => {
 
           newTracks.push({
             filePath: file,
-            title: common.title || file.split('/').pop()?.replace(/\.[^.]+$/, '') || 'Unknown',
+            title:
+              common.title ||
+              file
+                .split('/')
+                .pop()
+                ?.replace(/\.[^.]+$/, '') ||
+              'Unknown',
             artist: common.artist || 'Unknown Artist',
             album: common.album || 'Unknown Album',
             duration: format.duration || 0,
@@ -512,7 +546,7 @@ app.whenReady().then(async () => {
 
   // Register global media shortcuts for IEM/TWS headset controls and media keyboards
   const registerShortcut = (keys: string[], action: string) => {
-    keys.forEach(key => {
+    keys.forEach((key) => {
       try {
         globalShortcut.register(key, () => {
           if (mainWindow) mainWindow.webContents.send('media-control', action)
