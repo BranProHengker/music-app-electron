@@ -220,9 +220,13 @@ app.whenReady().then(async () => {
   // ─── Register media:// protocol handler ──────────────────────────
   protocol.handle('media', (request) => {
     try {
-      const url = new URL(request.url)
-      // Combine host and pathname to handle URLs normalized with 2 slashes (where 'home' becomes host)
-      let filePath = decodeURIComponent(url.host + url.pathname)
+      // Decode the URL directly after stripping the protocol prefix
+      // This prevents ERR_INVALID_URL when parsing Windows paths like media://C:\Users\...
+      let filePath = request.url.slice('media://'.length)
+      filePath = decodeURIComponent(filePath)
+      
+      // On Windows, the path might start with an extra slash if it was parsed strangely,
+      // but with simple slice, it usually starts with C:. If it's a Unix path, we need the leading slash.
       if (!filePath.startsWith('/') && !/^[a-zA-Z]:/.test(filePath)) {
         filePath = '/' + filePath
       }
