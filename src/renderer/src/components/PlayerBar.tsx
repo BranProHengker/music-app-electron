@@ -173,16 +173,22 @@ export default function PlayerBar({ onToggleQueue, isQueueOpen, displayedTracks 
 
   return (
     <div className="player-bar">
-      {/* Playback progress bar edge */}
-      <div className="progress-container" onMouseDown={handleProgressMouseDown}>
-        <div className="progress-track">
-          <div className="progress-fill" style={{ width: `${progressPercent}%` }}>
-            <div className="progress-thumb" />
-          </div>
-        </div>
+      {/* Paling Kiri: Kontrol Playback */}
+      <div className="player-controls-left">
+        <button className="btn-control" onClick={prevTrack} title="Previous">
+          <SkipBack size={20} weight="light" />
+        </button>
+
+        <button className="btn-play-pause" onClick={handlePlayClick} title={isPlaying ? 'Pause' : 'Play'}>
+          {isPlaying ? <Pause size={20} weight="fill" /> : <Play size={20} weight="fill" />}
+        </button>
+
+        <button className="btn-control" onClick={nextTrack} title="Next">
+          <SkipForward size={20} weight="light" />
+        </button>
       </div>
 
-      {/* Left side: Song details */}
+      {/* Kiri-Tengah: Informasi Lagu */}
       <div className="player-track-info">
         <div className="player-art">
           {currentTrack?.coverArt ? (
@@ -215,52 +221,42 @@ export default function PlayerBar({ onToggleQueue, isQueueOpen, displayedTracks 
         </div>
       </div>
 
-      {/* Center side: Controls */}
-      <div className="player-controls-container">
-        <div className="player-buttons">
-          <button
-            className={`btn-control ${isShuffle ? 'active' : ''}`}
-            onClick={toggleShuffle}
-            title="Shuffle"
-          >
-            <Shuffle size={18} weight="light" />
-          </button>
- 
-          <button className="btn-control" onClick={prevTrack} title="Previous">
-            <SkipBack size={20} weight="light" />
-          </button>
- 
-          <button className="btn-play-pause" onClick={handlePlayClick} title={isPlaying ? 'Pause' : 'Play'}>
-            {isPlaying ? <Pause size={20} weight="fill" /> : <Play size={20} weight="fill" />}
-          </button>
- 
-          <button className="btn-control" onClick={nextTrack} title="Next">
-            <SkipForward size={20} weight="light" />
-          </button>
- 
-          <button
-            className={`btn-control ${isRepeat !== 'off' ? 'active' : ''}`}
-            onClick={toggleRepeat}
-            title={`Repeat: ${isRepeat}`}
-          >
-            <Repeat size={18} weight="light" />
-          </button>
+      {/* Tengah: Progress Bar Inline */}
+      <div className="player-progress-middle">
+        <span className="progress-time">{formatTime(displayTime)}</span>
+        <div className="progress-container" onMouseDown={handleProgressMouseDown}>
+          <div className="progress-track">
+            <div className="progress-fill" style={{ width: `${progressPercent}%` }}>
+              <div className="progress-thumb" />
+            </div>
+          </div>
         </div>
- 
-        <div className="player-time-display">
-          <span>{formatTime(displayTime)}</span>
-          <span>/</span>
-          <span>{formatTime(duration)}</span>
-        </div>
+        <span className="progress-time">{formatTime(duration)}</span>
       </div>
- 
-      {/* Right side: Volume & Extra options */}
-      <div className="player-utilities">
+
+      {/* Kanan: Utilitas & Kontrol Volume */}
+      <div className="player-utilities-right">
         {currentTrack && (
           <div className="player-audio-tech-details" title="Audio Quality Spec">
             {getAudioTechDetailsString(currentTrack)}
           </div>
         )}
+
+        <button
+          className={`btn-control ${isShuffle ? 'active' : ''}`}
+          onClick={toggleShuffle}
+          title="Shuffle"
+        >
+          <Shuffle size={18} weight="light" />
+        </button>
+
+        <button
+          className={`btn-control ${isRepeat !== 'off' ? 'active' : ''}`}
+          onClick={toggleRepeat}
+          title={`Repeat: ${isRepeat}`}
+        >
+          <Repeat size={18} weight="light" />
+        </button>
 
         {onToggleQueue && (
           <button
@@ -271,7 +267,7 @@ export default function PlayerBar({ onToggleQueue, isQueueOpen, displayedTracks 
             <List size={20} weight="light" />
           </button>
         )}
- 
+
         <div className="volume-control">
           <button onClick={toggleMute} title={isMuted ? 'Unmute' : 'Mute'} className="btn-control">
             {getSpeakerIcon()}
@@ -285,7 +281,6 @@ export default function PlayerBar({ onToggleQueue, isQueueOpen, displayedTracks 
           </div>
         </div>
       </div>
-
     </div>
   )
 }

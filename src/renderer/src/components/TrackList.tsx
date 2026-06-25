@@ -1,4 +1,4 @@
-import { Play, SpeakerHigh, Heart, MusicNotes } from '@phosphor-icons/react'
+import { Play, SpeakerHigh, Heart, MusicNotes, Plus } from '@phosphor-icons/react'
 import { TrackMeta } from '../hooks/useAudioEngine'
 
 interface TrackListProps {
@@ -8,6 +8,7 @@ interface TrackListProps {
   isPlaying: boolean
   favorites: string[]
   onToggleFavorite: (filePath: string) => void
+  onAddToQueue?: (track: TrackMeta) => void
   sortField?: 'title' | 'artist' | 'album' | 'genre' | 'duration' | null
   sortOrder?: 'asc' | 'desc'
   onSort?: (field: 'title' | 'artist' | 'album' | 'genre' | 'duration') => void
@@ -20,6 +21,7 @@ export default function TrackList({
   isPlaying,
   favorites,
   onToggleFavorite,
+  onAddToQueue,
   sortField = null,
   sortOrder = 'asc',
   onSort
@@ -63,7 +65,7 @@ export default function TrackList({
         <div role="button" style={{ textAlign: 'right', justifyContent: 'flex-end' }} onClick={() => onSort?.('duration')}>
           Time{renderSortIndicator('duration')}
         </div>
-        <div style={{ justifySelf: 'center' }}>Like</div>
+        <div style={{ justifySelf: 'center' }}>Actions</div>
       </div>
 
       {tracks.map((track, index) => {
@@ -114,7 +116,19 @@ export default function TrackList({
               {formatDuration(track.duration)}
             </div>
 
-            <div style={{ justifySelf: 'center' }}>
+            <div style={{ justifySelf: 'center', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {onAddToQueue && (
+                <button
+                  className="btn-track-add-queue"
+                  title="Add to Queue"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onAddToQueue(track)
+                  }}
+                >
+                  <Plus size={16} weight="light" />
+                </button>
+              )}
               <button
                 className={`btn-track-favorite ${isLiked ? 'active' : ''}`}
                 onClick={(e) => {

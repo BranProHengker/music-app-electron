@@ -13,6 +13,7 @@ import Sidebar from './components/Sidebar'
 import TrackList from './components/TrackList'
 import PlaylistGrid from './components/PlaylistGrid'
 import PlayerBar from './components/PlayerBar'
+import QueuePanel from './components/QueuePanel'
 import { useAudioEngine, TrackMeta } from './hooks/useAudioEngine'
 
 interface AlbumGroup {
@@ -35,11 +36,17 @@ export default function App(): React.JSX.Element {
     toggleShuffle,
     togglePlay,
     toggleRepeat,
-    isShuffle
+    isShuffle,
+    queue,
+    addToQueue,
+    removeFromQueue,
+    clearQueue,
+    shuffleQueue
   } = useAudioEngine()
 
   // ─── State ──────────────────────────────────────────────────────────
   const [currentView, setCurrentView] = useState<'library' | 'favorites' | 'settings'>('library')
+  const [isQueueOpen, setIsQueueOpen] = useState(false)
   const [libraryFolder, setLibraryFolder] = useState<string | null>(null)
   const [tracks, setTracks] = useState<TrackMeta[]>([])
   const [favorites, setFavorites] = useState<string[]>([])
@@ -163,6 +170,9 @@ export default function App(): React.JSX.Element {
         } else if (e.key === 'l' || e.key === 'L') {
           e.preventDefault()
           toggleRepeat()
+        } else if (e.key === 'q' || e.key === 'Q') {
+          e.preventDefault()
+          setIsQueueOpen((prev) => !prev)
         }
       }
     }
@@ -188,7 +198,7 @@ export default function App(): React.JSX.Element {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('wheel', handleWheel)
     }
-  }, [historyIndex, history, volume, changeVolume, nextTrack, prevTrack, toggleShuffle, togglePlay, toggleRepeat, isShuffle])
+  }, [historyIndex, history, volume, changeVolume, nextTrack, prevTrack, toggleShuffle, togglePlay, toggleRepeat, isShuffle, setIsQueueOpen])
 
   // ─── Load Library and Settings ──────────────────────────────────────
   useEffect(() => {
@@ -535,6 +545,10 @@ export default function App(): React.JSX.Element {
                   <span className="keybind-action">Toggle Repeat (Loop) Mode</span>
                   <kbd className="keybind-key">Ctrl + L</kbd>
                 </div>
+                <div className="keybind-row">
+                  <span className="keybind-action">Toggle Play Queue</span>
+                  <kbd className="keybind-key">Ctrl + Q</kbd>
+                </div>
               </div>
             </div>
 
@@ -622,6 +636,7 @@ export default function App(): React.JSX.Element {
                   isPlaying={isPlaying}
                   favorites={favorites}
                   onToggleFavorite={handleToggleFavorite}
+                  onAddToQueue={addToQueue}
                   sortField={sortField}
                   sortOrder={sortOrder}
                   onSort={(field) => {
@@ -643,8 +658,27 @@ export default function App(): React.JSX.Element {
         )}
       </main>
 
+      {/* Queue Panel */}
+      <QueuePanel
+        isOpen={isQueueOpen}
+        onClose={() => setIsQueueOpen(false)}
+        allTracks={tracks}
+        onAddToQueue={addToQueue}
+        onRemoveFromQueue={removeFromQueue}
+        onClearQueue={clearQueue}
+        onShuffleQueue={shuffleQueue}
+        onPlayTrack={playTrack}
+        currentTrack={currentTrack}
+        isPlaying={isPlaying}
+        queue={queue}
+      />
+
       {/* Bottom fixed Player Control Bar */}
-      <PlayerBar displayedTracks={displayedTracks} />
+      <PlayerBar
+        onToggleQueue={() => setIsQueueOpen((prev) => !prev)}
+        isQueueOpen={isQueueOpen}
+        displayedTracks={displayedTracks}
+      />
     </div>
   )
 }

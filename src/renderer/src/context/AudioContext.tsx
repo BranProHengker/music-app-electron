@@ -39,6 +39,7 @@ export interface AudioContextType {
   addToQueue: (track: TrackMeta) => void
   removeFromQueue: (filePath: string) => void
   clearQueue: () => void
+  shuffleQueue: () => void
 }
 
 export const AudioContext = createContext<AudioContextType | undefined>(undefined)
@@ -423,6 +424,22 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }
 
+  // Shuffle Queue (shuffles everything except the current playing track, keeping it first)
+  const shuffleQueue = () => {
+    setQueue((prev) => {
+      if (prev.length <= 1) return prev
+      const currentTrackIndex = prev.findIndex((t) => t.filePath === currentTrack?.filePath)
+      if (currentTrackIndex !== -1) {
+        const current = prev[currentTrackIndex]
+        const rest = prev.filter((_, i) => i !== currentTrackIndex)
+        const shuffled = [...rest].sort(() => Math.random() - 0.5)
+        return [current, ...shuffled]
+      } else {
+        return [...prev].sort(() => Math.random() - 0.5)
+      }
+    })
+  }
+
   return (
     <AudioContext.Provider
       value={{
@@ -446,7 +463,8 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
         toggleRepeat,
         addToQueue,
         removeFromQueue,
-        clearQueue
+        clearQueue,
+        shuffleQueue
       }}
     >
       {children}
