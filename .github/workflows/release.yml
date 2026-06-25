@@ -48,8 +48,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "$RUNNER_OS" == "Windows" ]; then
-            pnpm run build:win
+            pnpm run build:win -- --publish always
           else
-            pnpm run build:linux
+            pnpm run build:linux -- --publish always
           fi
         shell: bash
