@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: music-app
+appId: com.bonkeymusic.app
+productName: Bonkey Music
 directories:
   buildResources: build
 files:
@@ -12,7 +12,7 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: music-app
+  executableName: bonkey-music
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
@@ -34,7 +34,7 @@ linux:
     - snap
     - deb
   maintainer: electronjs.org
-  category: Utility
+  category: Audio
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
