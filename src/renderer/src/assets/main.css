@@ -658,6 +658,299 @@ button {
   line-height: 1.4;
 }
 
+/* ─── Bento Grid Redesign Upgrades ─── */
+
+.bento-card-liked {
+  background: linear-gradient(135deg, rgba(30, 11, 54, 0.6) 0%, rgba(59, 13, 45, 0.6) 100%) !important;
+  border-color: rgba(147, 51, 234, 0.15) !important;
+}
+
+.bento-card-liked:hover {
+  border-color: rgba(219, 39, 119, 0.4) !important;
+  box-shadow: 0 8px 32px rgba(219, 39, 119, 0.15), 0 2px 8px rgba(147, 51, 234, 0.1) !important;
+}
+
+.liked-card-bg-icon {
+  position: absolute;
+  right: -16px;
+  bottom: -24px;
+  color: var(--accent);
+  opacity: 0.05;
+  transform: rotate(-15deg);
+  transition: all var(--duration-normal) var(--ease-out-expo);
+  pointer-events: none;
+}
+
+.bento-card-liked:hover .liked-card-bg-icon {
+  transform: rotate(-10deg) scale(1.08);
+  opacity: 0.08;
+}
+
+/* Recently Played Card */
+.bento-card-recent {
+  position: relative;
+}
+
+.recent-blur-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.12;
+  filter: blur(20px);
+  transform: scale(1.1);
+  pointer-events: none;
+}
+
+.recent-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(10, 10, 10, 0.9) 0%, rgba(10, 10, 10, 0.6) 100%);
+  z-index: 1;
+}
+
+.recent-content {
+  position: relative;
+  z-index: 2;
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.recent-track-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  cursor: pointer;
+}
+
+.recent-cover-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+
+.recent-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.recent-cover-placeholder {
+  width: 100%;
+  height: 100%;
+  background-color: var(--bg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+}
+
+.recent-details {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.recent-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-artist {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-recent-play {
+  align-self: flex-end;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: var(--text-primary);
+  color: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--duration-fast) var(--ease-out-quint);
+  margin-top: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.btn-recent-play:hover {
+  transform: scale(1.08);
+  background-color: var(--accent);
+}
+
+.recent-empty {
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  height: 100%;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.recent-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.recent-empty-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  max-width: 140px;
+}
+
+/* Stats Card Minimalist */
+.bento-card-stats {
+  background-color: var(--bg-secondary) !important;
+  border-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+.bento-card-stats:hover {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+}
+
+.stats-metrik-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+
+.stats-metrik-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stats-metrik-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.02);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.stats-metrik-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.stats-metrik-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.stats-metrik-label {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.stats-browse-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  transition: color var(--duration-fast) var(--ease-out-quint);
+}
+
+.bento-card-stats:hover .stats-browse-action {
+  color: var(--accent);
+}
+
+/* Welcome Card dot-pattern background */
+.bento-card-welcome {
+  background-color: var(--bg-secondary) !important;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px) !important;
+  background-size: 16px 16px !important;
+  border-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+.bento-card-welcome:hover {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+}
+
+.welcome-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 6px;
+}
+
+.welcome-desc {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin-top: 8px;
+  max-width: 90%;
+}
+
+.folder-code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background-color: rgba(255, 255, 255, 0.04);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--accent);
+}
+
+.btn-sync-quick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  background-color: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all var(--duration-fast) var(--ease-out-quint);
+  cursor: pointer;
+  width: fit-content;
+}
+
+.btn-sync-quick:hover {
+  background-color: var(--text-primary);
+  color: var(--bg-primary);
+  transform: translateY(-1px);
+}
+
+.btn-sync-quick:active {
+  transform: translateY(1px);
+}
+
 /* Standard Playlist Card (for asymmetric variety) */
 .playlist-card-standard {
   display: flex;
@@ -1020,25 +1313,38 @@ button {
   text-overflow: ellipsis;
 }
 
-.player-artist-row {
+.player-title-row {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  margin-top: 2px;
+}
+
+.player-audio-tech-details {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  margin-right: 8px;
 }
 
 .audio-quality-badge {
-  font-size: 9px;
+  font-size: 8.5px;
   font-family: var(--font-mono);
   background: rgba(212, 168, 67, 0.08);
   color: var(--accent);
-  padding: 1px 5px;
+  padding: 1px 4px;
   border-radius: 3px;
   border: 1px solid rgba(212, 168, 67, 0.15);
   white-space: nowrap;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 /* Center: Playback Controls */

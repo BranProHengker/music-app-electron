@@ -66,37 +66,38 @@ export default function PlayerBar({ onToggleQueue, isQueueOpen, displayedTracks 
     return `${m}:${s < 10 ? '0' : ''}${s}`
   }
 
-  // Generate audio quality details badge text with extension fallbacks if metadata is not yet scanned
-  const getAudioQualityString = (track: TrackMeta) => {
+  // Get short format badge (e.g. "FLAC", "MP3")
+  const getAudioFormatBadge = (track: TrackMeta) => {
+    const ext = track.filePath.split('.').pop()?.toLowerCase() || ''
+    return track.container ? track.container.toUpperCase() : (ext === 'm4a' ? 'M4A' : ext.toUpperCase())
+  }
+
+  // Get tech details (e.g. "Lossless • 16-bit / 44.1 kHz" or "320 kbps")
+  const getAudioTechDetailsString = (track: TrackMeta) => {
     const ext = track.filePath.split('.').pop()?.toLowerCase() || ''
     
-    // 1. Container / Format name (e.g. FLAC, MP3, etc.)
-    const container = track.container 
-      ? track.container.toUpperCase() 
-      : (ext === 'm4a' ? 'M4A' : ext.toUpperCase())
-    
-    // 2. Classify quality (Hi-Res Lossless, Lossless, Lossy)
+    // 1. Classify quality
     const isLosslessExt = ['flac', 'wav', 'alac', 'ape'].includes(ext)
     const isLossless = track.lossless !== undefined ? track.lossless : isLosslessExt
 
-    let qualityLabel = ''
+    const parts: string[] = []
+    
     if (isLossless) {
       const isHiRes = (track.sampleRate && track.sampleRate > 44100) || (track.bitsPerSample && track.bitsPerSample > 16)
-      qualityLabel = isHiRes ? 'Hi-Res' : 'Lossless'
-    }
-    
-    // 3. Technical details (e.g. 24-bit / 96 kHz or 320 kbps)
-    let techDetails = ''
-    if (isLossless) {
+      parts.push(isHiRes ? 'Hi-Res Lossless' : 'Lossless')
+      
       const bitDepth = track.bitsPerSample ? `${track.bitsPerSample}-bit` : ''
       const sampleRateKhz = track.sampleRate ? `${(track.sampleRate / 1000).toFixed(track.sampleRate % 1000 === 0 ? 0 : 1)} kHz` : ''
-      techDetails = [bitDepth, sampleRateKhz].filter(Boolean).join(' / ')
-    } else if (track.bitrate) {
-      techDetails = `${Math.round(track.bitrate / 1000)} kbps`
+      const tech = [bitDepth, sampleRateKhz].filter(Boolean).join(' / ')
+      if (tech) parts.push(tech)
+    } else {
+      parts.push('Lossy')
+      if (track.bitrate) {
+        parts.push(`${Math.round(track.bitrate / 1000)} kbps`)
+      }
     }
 
-    // Combine them into a clean string, e.g.: "FLAC • Hi-Res • 24-bit / 96 kHz"
-    return [container, qualityLabel, techDetails].filter(Boolean).join(' • ')
+    return parts.join(' • ')
   }
 
   // Calculate percentages
@@ -191,15 +192,26 @@ export default function PlayerBar({ onToggleQueue, isQueueOpen, displayedTracks 
           )}
         </div>
         <div className="player-details">
-          <span className="player-title">{currentTrack?.title || 'Not Playing'}</span>
-          <div className="player-artist-row">
-            <span className="player-artist">{currentTrack?.artist || 'Select a song'}</span>
+          <div className="player-title-row">
+            <span className="player-title" title={currentTrack?.title}>
+              {currentTrack?.title || 'Not Playing'}
+            </span>
             {currentTrack && (
               <span className="audio-quality-badge">
-                {getAudioQualityString(currentTrack)}
+                {getAudioFormatBadge(currentTrack)}
               </span>
             )}
           </div>
+          <span className="player-artist" title={currentTrack ? `${currentTrack.artist}${currentTrack.album ? ` • ${currentTrack.album}` : ''}` : ''}>
+            {currentTrack ? (
+              <>
+                {currentTrack.artist}
+                {currentTrack.album && <span style={{ opacity: 0.6 }}> • {currentTrack.album}</span>}
+              </>
+            ) : (
+              'Select a song'
+            )}
+          </span>
         </div>
       </div>
 
@@ -213,19 +225,19 @@ export default function PlayerBar({ onToggleQueue, isQueueOpen, displayedTracks 
           >
             <Shuffle size={18} weight="light" />
           </button>
-
+ 
           <button className="btn-control" onClick={prevTrack} title="Previous">
             <SkipBack size={20} weight="light" />
           </button>
-
+ 
           <button className="btn-play-pause" onClick={handlePlayClick} title={isPlaying ? 'Pause' : 'Play'}>
             {isPlaying ? <Pause size={20} weight="fill" /> : <Play size={20} weight="fill" />}
           </button>
-
+ 
           <button className="btn-control" onClick={nextTrack} title="Next">
             <SkipForward size={20} weight="light" />
           </button>
-
+ 
           <button
             className={`btn-control ${isRepeat !== 'off' ? 'active' : ''}`}
             onClick={toggleRepeat}
@@ -234,16 +246,22 @@ export default function PlayerBar({ onToggleQueue, isQueueOpen, displayedTracks 
             <Repeat size={18} weight="light" />
           </button>
         </div>
-
+ 
         <div className="player-time-display">
           <span>{formatTime(displayTime)}</span>
           <span>/</span>
           <span>{formatTime(duration)}</span>
         </div>
       </div>
-
+ 
       {/* Right side: Volume & Extra options */}
       <div className="player-utilities">
+        {currentTrack && (
+          <div className="player-audio-tech-details" title="Audio Quality Spec">
+            {getAudioTechDetailsString(currentTrack)}
+          </div>
+        )}
+
         {onToggleQueue && (
           <button
             className={`btn-control ${isQueueOpen ? 'active' : ''}`}
@@ -253,7 +271,7 @@ export default function PlayerBar({ onToggleQueue, isQueueOpen, displayedTracks 
             <List size={20} weight="light" />
           </button>
         )}
-
+ 
         <div className="volume-control">
           <button onClick={toggleMute} title={isMuted ? 'Unmute' : 'Mute'} className="btn-control">
             {getSpeakerIcon()}

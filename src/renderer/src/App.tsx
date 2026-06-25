@@ -594,6 +594,9 @@ export default function App(): React.JSX.Element {
                 onSelectAlbum={(name) => setActiveAlbum(name)}
                 onSelectFavorites={() => setCurrentView('favorites')}
                 onSelectAllSongs={() => setSearchQuery(' ')} // triggers displaying list view with space filter (resets to lists)
+                libraryFolder={libraryFolder}
+                onScanFolder={() => libraryFolder && handleScanFolder(libraryFolder)}
+                isScanning={isScanning}
               />
             )}
 
