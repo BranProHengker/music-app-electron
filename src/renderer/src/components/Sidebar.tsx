@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { House, Heart, Gear, Plus, Disc, MusicNotes } from '@phosphor-icons/react'
 import iconApp from '../assets/iconapp.png'
+import { TrackMeta } from '../hooks/useAudioEngine'
 
 interface SidebarProps {
   currentView: 'library' | 'favorites' | 'settings'
@@ -10,10 +11,14 @@ interface SidebarProps {
   activePlaylist: string | null
   setActivePlaylist: (name: string | null) => void
   onCreatePlaylist: () => void
+  onAddFolder: () => void
+  onImportAudio: () => void
   albums: { name: string; artist: string; coverArt: string | null }[]
   activeAlbum: string | null
   setActiveAlbum: (name: string | null) => void
   playlistTracks: Record<string, string[]>
+  playlistCovers: Record<string, string>
+  tracks: TrackMeta[]
 }
 
 export default function Sidebar({
@@ -24,12 +29,29 @@ export default function Sidebar({
   activePlaylist,
   setActivePlaylist,
   onCreatePlaylist,
+  onAddFolder,
+  onImportAudio,
   albums,
   activeAlbum,
   setActiveAlbum,
-  playlistTracks
+  playlistTracks,
+  playlistCovers,
+  tracks
 }: SidebarProps) {
   const [filter, setFilter] = useState<'all' | 'playlists' | 'albums'>('all')
+  const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false)
+
+  useEffect(() => {
+    function handleClickOutside() {
+      setIsPlusMenuOpen(false)
+    }
+    if (isPlusMenuOpen) {
+      document.addEventListener('click', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('click', handleClickOutside)
+    }
+  }, [isPlusMenuOpen])
 
   const handleNavClick = (view: 'library' | 'favorites' | 'settings') => {
     setCurrentView(view)
@@ -39,18 +61,31 @@ export default function Sidebar({
 
   // Combine playlists and albums into a unified list, then filter & sort them
   const libraryItems = useMemo(() => {
-    const playlistItems = playlists.map((name) => ({
-      type: 'playlist' as const,
-      id: `playlist-${name}`,
-      name,
-      subtitle: `Playlist • ${playlistTracks[name]?.length || 0} songs`,
-      coverArt: null,
-      isActive: activePlaylist === name,
-      onClick: () => {
-        setCurrentView('library')
-        setActivePlaylist(name)
+    const playlistItems = playlists.map((name) => {
+      const customCover = playlistCovers[name]
+      let coverArt: string | null = customCover || null
+
+      if (!coverArt) {
+        const filePaths = playlistTracks[name] || []
+        const firstSongWithCover = tracks.find((t) => filePaths.includes(t.filePath) && t.coverArt)
+        if (firstSongWithCover) {
+          coverArt = firstSongWithCover.coverArt
+        }
       }
-    }))
+
+      return {
+        type: 'playlist' as const,
+        id: `playlist-${name}`,
+        name,
+        subtitle: `Playlist • ${playlistTracks[name]?.length || 0} songs`,
+        coverArt,
+        isActive: activePlaylist === name,
+        onClick: () => {
+          setCurrentView('library')
+          setActivePlaylist(name)
+        }
+      }
+    })
 
     const albumItems = albums.map((album) => ({
       type: 'album' as const,
@@ -78,7 +113,7 @@ export default function Sidebar({
       return combined.filter((item) => item.type === 'album')
     }
     return combined
-  }, [playlists, albums, playlistTracks, activePlaylist, activeAlbum, filter, setCurrentView, setActivePlaylist, setActiveAlbum])
+  }, [playlists, albums, playlistTracks, playlistCovers, tracks, activePlaylist, activeAlbum, filter, setCurrentView, setActivePlaylist, setActiveAlbum])
 
   return (
     <aside className="sidebar">
@@ -107,15 +142,60 @@ export default function Sidebar({
 
       <div className="sidebar-divider" />
 
-      <div className="sidebar-playlists-header">
+      <div className="sidebar-playlists-header" style={{ position: 'relative' }}>
         <span>Your Library</span>
         <button
-          className="btn-add-playlist"
-          onClick={onCreatePlaylist}
-          title="Create Playlist"
+          className={`btn-add-playlist ${isPlusMenuOpen ? 'active' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            setIsPlusMenuOpen(!isPlusMenuOpen)
+          }}
+          title="Add Content"
         >
           <Plus size={16} weight="light" />
         </button>
+
+        {isPlusMenuOpen && (
+          <div
+            className="track-dropdown-menu sidebar-plus-menu"
+            style={{
+              position: 'absolute',
+              right: '12px',
+              top: '32px',
+              width: '180px',
+              zIndex: 1000
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="dropdown-item"
+              onClick={() => {
+                onCreatePlaylist()
+                setIsPlusMenuOpen(false)
+              }}
+            >
+              ＋ Create Playlist
+            </button>
+            <button
+              className="dropdown-item"
+              onClick={() => {
+                onAddFolder()
+                setIsPlusMenuOpen(false)
+              }}
+            >
+              📁 Add Music Folder
+            </button>
+            <button
+              className="dropdown-item"
+              onClick={() => {
+                onImportAudio()
+                setIsPlusMenuOpen(false)
+              }}
+            >
+              🎵 Import Audio Files
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filter Pills */}
@@ -162,9 +242,13 @@ export default function Sidebar({
                     </div>
                   )
                 ) : (
-                  <div className="item-cover-placeholder playlist-placeholder">
-                    <MusicNotes size={20} weight="light" />
-                  </div>
+                  item.coverArt ? (
+                    <img src={item.coverArt} alt={item.name} className="item-cover-img" />
+                  ) : (
+                    <div className="item-cover-placeholder playlist-placeholder">
+                      <MusicNotes size={20} weight="light" />
+                    </div>
+                  )
                 )}
               </div>
               <div className="library-item-info">

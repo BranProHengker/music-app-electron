@@ -66,6 +66,7 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
   const [isRepeat, setIsRepeat] = useState<'off' | 'one' | 'all'>('off')
   const [queue, setQueue] = useState<TrackMeta[]>([])
   const [originalQueue, setOriginalQueue] = useState<TrackMeta[]>([])
+  const [manualQueuePaths, setManualQueuePaths] = useState<string[]>([])
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const rafRef = useRef<number | null>(null)
@@ -213,6 +214,7 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
   const playTrack = (track: TrackMeta, tracksContext?: TrackMeta[]) => {
     if (!audioRef.current) return
 
+    setManualQueuePaths([])
     const mediaUrl = getAudioUrl(track.filePath)
     
     // Set the track meta first
@@ -393,12 +395,45 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     })
   }
 
-  // Add to Queue (push to end of current queue)
+  // Add to Queue (insert to be the next played track)
   const addToQueue = (track: TrackMeta) => {
-    setQueue((prev) => {
-      if (prev.some((t) => t.filePath === track.filePath)) return prev
-      return [...prev, track]
+    setManualQueuePaths((prev) => {
+      if (prev.includes(track.filePath)) return prev
+      return [...prev, track.filePath]
     })
+
+    setQueue((prev) => {
+      // Remove it from the queue if it's already there to re-inject at the next position
+      const filtered = prev.filter((t) => t.filePath !== track.filePath)
+
+      if (!currentTrack) {
+        return [...filtered, track]
+      }
+
+      const currentTrackIndex = filtered.findIndex((t) => t.filePath === currentTrack.filePath)
+      if (currentTrackIndex === -1) {
+        return [...filtered, track]
+      }
+
+      // Check which tracks are manually queued. We construct the active manual list.
+      const activePaths = manualQueuePaths.includes(track.filePath)
+        ? manualQueuePaths
+        : [...manualQueuePaths, track.filePath]
+
+      // Find the index to insert after all manually queued tracks
+      let insertIndex = currentTrackIndex + 1
+      while (
+        insertIndex < filtered.length &&
+        activePaths.includes(filtered[insertIndex].filePath)
+      ) {
+        insertIndex++
+      }
+
+      const nextQueue = [...filtered]
+      nextQueue.splice(insertIndex, 0, track)
+      return nextQueue
+    })
+
     setOriginalQueue((prev) => {
       if (prev.some((t) => t.filePath === track.filePath)) return prev
       return [...prev, track]
@@ -409,6 +444,7 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
   const removeFromQueue = (filePath: string) => {
     setQueue((prev) => prev.filter((t) => t.filePath !== filePath))
     setOriginalQueue((prev) => prev.filter((t) => t.filePath !== filePath))
+    setManualQueuePaths((prev) => prev.filter((p) => p !== filePath))
     if (currentTrack?.filePath === filePath) {
       nextTrack()
     }
@@ -418,6 +454,7 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
   const clearQueue = () => {
     setQueue([])
     setOriginalQueue([])
+    setManualQueuePaths([])
     setCurrentTrack(null)
     setIsPlaying(false)
     if (audioRef.current) {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Play,
   Pause,
@@ -11,7 +11,8 @@ import {
   SpeakerX,
   MusicNotes,
   List,
-  ChatTeardropText
+  ChatTeardropText,
+  PlusCircle
 } from '@phosphor-icons/react'
 import { useAudioEngine } from '../hooks/useAudioEngine'
 import { TrackMeta } from '../context/AudioContext'
@@ -22,6 +23,12 @@ interface PlayerBarProps {
   onToggleLyrics?: () => void
   isLyricsOpen?: boolean
   displayedTracks?: TrackMeta[]
+  playlists?: string[]
+  favorites?: string[]
+  onAddToQueue?: (track: TrackMeta) => void
+  onToggleFavorite?: (filePath: string) => void
+  onAddToPlaylist?: (playlistName: string, track: TrackMeta) => void
+  onAddToNewPlaylist?: (track: TrackMeta) => void
 }
 
 export default function PlayerBar({
@@ -29,7 +36,13 @@ export default function PlayerBar({
   isQueueOpen,
   onToggleLyrics,
   isLyricsOpen,
-  displayedTracks
+  displayedTracks,
+  playlists,
+  favorites,
+  onAddToQueue,
+  onToggleFavorite,
+  onAddToPlaylist,
+  onAddToNewPlaylist
 }: PlayerBarProps) {
   const {
     currentTrack,
@@ -53,6 +66,23 @@ export default function PlayerBar({
 
   const [isDragging, setIsDragging] = useState(false)
   const [dragTime, setDragTime] = useState(0)
+
+  const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false)
+  const plusMenuRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (plusMenuRef.current && !plusMenuRef.current.contains(event.target as Node)) {
+        setIsPlusMenuOpen(false)
+      }
+    }
+    if (isPlusMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isPlusMenuOpen])
 
   const handlePlayClick = () => {
     if (currentTrack) {
@@ -228,6 +258,95 @@ export default function PlayerBar({
             )}
           </span>
         </div>
+
+        {currentTrack && (
+          <div style={{ position: 'relative' }}>
+            <button 
+              className="btn-player-action" 
+              onClick={() => setIsPlusMenuOpen((prev) => !prev)}
+              title="Add / Actions"
+            >
+              <PlusCircle size={22} weight="light" />
+            </button>
+
+            {isPlusMenuOpen && (
+              <div 
+                className="track-dropdown-menu" 
+                ref={plusMenuRef} 
+                style={{ 
+                  position: 'absolute', 
+                  bottom: '36px', 
+                  left: '0', 
+                  zIndex: 1000, 
+                  width: '200px' 
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {onAddToQueue && (
+                  <button
+                    className="dropdown-item"
+                    onClick={() => {
+                      onAddToQueue(currentTrack)
+                      setIsPlusMenuOpen(false)
+                    }}
+                  >
+                    Add to Queue
+                  </button>
+                )}
+                
+                {onToggleFavorite && (
+                  <button
+                    className="dropdown-item"
+                    onClick={() => {
+                      onToggleFavorite(currentTrack.filePath)
+                      setIsPlusMenuOpen(false)
+                    }}
+                  >
+                    {favorites?.includes(currentTrack.filePath) ? 'Remove from Liked Songs' : 'Save to Liked Songs'}
+                  </button>
+                )}
+
+                {onAddToPlaylist && playlists && (
+                  <div className="dropdown-submenu-trigger">
+                    <span>Add to Playlist</span>
+                    <span className="submenu-arrow">▶</span>
+                    <div className="dropdown-submenu" style={{ bottom: '0', top: 'auto' }}>
+                      {onAddToNewPlaylist && (
+                        <>
+                          <button
+                            className="dropdown-item"
+                            style={{ color: 'var(--accent)', fontWeight: 'bold' }}
+                            onClick={() => {
+                              onAddToNewPlaylist(currentTrack)
+                              setIsPlusMenuOpen(false)
+                            }}
+                          >
+                            ＋ New Playlist
+                          </button>
+                          {playlists.length > 0 && (
+                            <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />
+                          )}
+                        </>
+                      )}
+                      {playlists.map((playlist) => (
+                        <button
+                          key={playlist}
+                          className="dropdown-item"
+                          onClick={() => {
+                            onAddToPlaylist(playlist, currentTrack)
+                            setIsPlusMenuOpen(false)
+                          }}
+                        >
+                          {playlist}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Tengah: Progress Bar Inline */}

@@ -6,7 +6,13 @@ import {
   ArrowClockwise,
   Heart,
   Folder,
-  Info
+  Info,
+  PencilSimple,
+  Trash,
+  DownloadSimple,
+  MusicNotes,
+  Play,
+  X
 } from '@phosphor-icons/react'
 import iconApp from './assets/iconapp.png'
 
@@ -55,6 +61,7 @@ export default function App(): React.JSX.Element {
   const [isQueueOpen, setIsQueueOpen] = useState(false)
   const [isLyricsOpen, setIsLyricsOpen] = useState(false)
   const [libraryFolder, setLibraryFolder] = useState<string | null>(null)
+  const [libraryFolders, setLibraryFolders] = useState<string[]>([])
   const [tracks, setTracks] = useState<TrackMeta[]>([])
   const [favorites, setFavorites] = useState<string[]>([])
   const [playlists, setPlaylists] = useState<string[]>([])
@@ -66,6 +73,11 @@ export default function App(): React.JSX.Element {
   const [isScanning, setIsScanning] = useState(false)
   const [sortField, setSortField] = useState<'title' | 'artist' | 'album' | 'genre' | 'duration' | null>(null)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [playlistSearch, setPlaylistSearch] = useState('')
+  const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false)
+  const [playlistTrackPending, setPlaylistTrackPending] = useState<TrackMeta | null>(null)
+  const [newPlaylistName, setNewPlaylistName] = useState('')
+  const [playlistCovers, setPlaylistCovers] = useState<Record<string, string>>({})
 
   // ─── Navigation History ──────────────────────────────────────────────
   const [history, setHistory] = useState<Array<{
@@ -209,6 +221,9 @@ export default function App(): React.JSX.Element {
           searchInputRef.current?.select()
         } else if (e.key === 'l' || e.key === 'L') {
           e.preventDefault()
+          setIsLyricsOpen((prev) => !prev)
+        } else if (e.key === 't' || e.key === 'T') {
+          e.preventDefault()
           toggleRepeat()
         } else if (e.key === 'q' || e.key === 'Q') {
           e.preventDefault()
@@ -262,6 +277,11 @@ export default function App(): React.JSX.Element {
         if (typeof settings.libraryFolder === 'string') {
           setLibraryFolder(settings.libraryFolder)
         }
+        if (Array.isArray(settings.libraryFolders)) {
+          setLibraryFolders(settings.libraryFolders as string[])
+        } else if (typeof settings.libraryFolder === 'string') {
+          setLibraryFolders([settings.libraryFolder])
+        }
         if (Array.isArray(settings.favorites)) {
           setFavorites(settings.favorites as string[])
         }
@@ -270,6 +290,9 @@ export default function App(): React.JSX.Element {
         }
         if (settings.playlistTracks && typeof settings.playlistTracks === 'object') {
           setPlaylistTracks(settings.playlistTracks as Record<string, string[]>)
+        }
+        if (settings.playlistCovers && typeof settings.playlistCovers === 'object') {
+          setPlaylistCovers(settings.playlistCovers as Record<string, string>)
         }
       }
 
@@ -292,11 +315,15 @@ export default function App(): React.JSX.Element {
   }
 
   // ─── Folder Selection & Scanning ────────────────────────────────────
-  const handleSelectFolder = async () => {
+  const handleSelectAndAddFolder = async () => {
     const folder = await window.api.selectFolder()
     if (folder) {
-      setLibraryFolder(folder)
-      handleScanFolder(folder)
+      if (!libraryFolders.includes(folder)) {
+        const nextFolders = [...libraryFolders, folder]
+        setLibraryFolders(nextFolders)
+        setLibraryFolder(folder)
+      }
+      await handleScanFolder(folder)
     }
   }
 
@@ -307,9 +334,41 @@ export default function App(): React.JSX.Element {
       const scannedTracks = await window.api.scanFolder(path)
       if (scannedTracks && Array.isArray(scannedTracks)) {
         setTracks(scannedTracks as TrackMeta[])
+        
+        // Reload folders from settings
+        const settings = await window.api.loadSettings()
+        if (settings && Array.isArray(settings.libraryFolders)) {
+          setLibraryFolders(settings.libraryFolders as string[])
+        }
       }
     } catch (err) {
       console.error('Scan error:', err)
+    } finally {
+      setIsScanning(false)
+    }
+  }
+
+  const handleRemoveFolder = async (folderPath: string) => {
+    const confirmRemove = window.confirm(
+      `Are you sure you want to remove the folder "${folderPath}" from your library? The songs inside will be removed from your library.`
+    )
+    if (!confirmRemove) return
+
+    setIsScanning(true)
+    try {
+      const updatedTracks = await window.api.removeLibraryFolder(folderPath)
+      setTracks(updatedTracks as TrackMeta[])
+
+      const settings = await window.api.loadSettings()
+      let folders: string[] = Array.isArray(settings.libraryFolders)
+        ? (settings.libraryFolders as string[])
+        : []
+      setLibraryFolders(folders)
+      if (libraryFolder === folderPath) {
+        setLibraryFolder(folders[0] || null)
+      }
+    } catch (err) {
+      console.error('Failed to remove folder:', err)
     } finally {
       setIsScanning(false)
     }
@@ -344,25 +403,198 @@ export default function App(): React.JSX.Element {
       const clearedTracks = await window.api.resetLibrary()
       setTracks(clearedTracks)
       setLibraryFolder(null)
+      setLibraryFolders([])
     } catch (err) {
       console.error('Failed to reset library:', err)
       // Fallback: clear the UI tracks anyway
       setTracks([])
       setLibraryFolder(null)
+      setLibraryFolders([])
     } finally {
       setIsScanning(false)
     }
   }
 
-  // ─── Playlists Management ──────────────────────────────────────────
-  const handleCreatePlaylist = async () => {
-    const name = prompt('Enter playlist name:')
+  const handleCreatePlaylist = (track?: TrackMeta) => {
+    setNewPlaylistName('')
+    if (track) {
+      setPlaylistTrackPending(track)
+    } else {
+      setPlaylistTrackPending(null)
+    }
+    setIsCreatePlaylistOpen(true)
+  }
+
+  const handleSubmitNewPlaylist = async () => {
+    const trimmed = newPlaylistName.trim()
+    if (!trimmed) return
+
+    if (playlists.includes(trimmed)) {
+      alert(`Playlist "${trimmed}" already exists.`)
+      return
+    }
+
+    const nextPlaylists = [...playlists, trimmed]
+    setPlaylists(nextPlaylists)
+
+    let nextPlaylistTracks = { ...playlistTracks }
+    if (playlistTrackPending) {
+      nextPlaylistTracks[trimmed] = [playlistTrackPending.filePath]
+      setPlaylistTracks(nextPlaylistTracks)
+    }
+
+    await persistSettings({
+      playlists: nextPlaylists,
+      playlistTracks: nextPlaylistTracks
+    })
+
+    // Reset states and close modal
+    setNewPlaylistName('')
+    setIsCreatePlaylistOpen(false)
+    setPlaylistTrackPending(null)
+  }
+
+  const handleAddToPlaylist = async (playlistName: string, track: TrackMeta) => {
+    const currentTracks = playlistTracks[playlistName] || []
+    if (currentTracks.includes(track.filePath)) {
+      alert(`Song is already in playlist "${playlistName}"`)
+      return
+    }
+    const updatedTracks = {
+      ...playlistTracks,
+      [playlistName]: [...currentTracks, track.filePath]
+    }
+    setPlaylistTracks(updatedTracks)
+    await persistSettings({ playlistTracks: updatedTracks })
+  }
+
+  const handleRemoveFromPlaylist = async (track: TrackMeta) => {
+    if (!activePlaylist) return
+    const currentTracks = playlistTracks[activePlaylist] || []
+    const nextTracks = currentTracks.filter((path) => path !== track.filePath)
+    const updatedTracks = {
+      ...playlistTracks,
+      [activePlaylist]: nextTracks
+    }
+    setPlaylistTracks(updatedTracks)
+    await persistSettings({ playlistTracks: updatedTracks })
+  }
+
+  const handleChangePlaylistCover = async (playlistName: string) => {
+    try {
+      const dataUri = await window.api.selectImage()
+      if (dataUri) {
+        const nextCovers = {
+          ...playlistCovers,
+          [playlistName]: dataUri
+        }
+        setPlaylistCovers(nextCovers)
+        await persistSettings({ playlistCovers: nextCovers })
+      }
+    } catch (err) {
+      console.error('Failed to change playlist cover:', err)
+    }
+  }
+
+  const handlePlayPlaylist = () => {
+    if (displayedTracks.length > 0) {
+      playTrack(displayedTracks[0], displayedTracks)
+    }
+  }
+
+  const handleReorderPlaylistTracks = async (startIndex: number, endIndex: number) => {
+    if (!activePlaylist) return
+    const currentTracks = [...(playlistTracks[activePlaylist] || [])]
+    const [removed] = currentTracks.splice(startIndex, 1)
+    currentTracks.splice(endIndex, 0, removed)
+
+    const nextPlaylistTracks = {
+      ...playlistTracks,
+      [activePlaylist]: currentTracks
+    }
+    setPlaylistTracks(nextPlaylistTracks)
+    await persistSettings({ playlistTracks: nextPlaylistTracks })
+  }
+
+  const handleRenamePlaylist = async (oldName: string) => {
+    const name = prompt(`Rename playlist "${oldName}" to:`, oldName)
     if (!name) return
     const trimmed = name.trim()
-    if (trimmed && !playlists.includes(trimmed)) {
-      const nextPlaylists = [...playlists, trimmed]
-      setPlaylists(nextPlaylists)
-      await persistSettings({ playlists: nextPlaylists })
+    if (!trimmed || trimmed === oldName) return
+
+    if (playlists.includes(trimmed)) {
+      alert(`A playlist named "${trimmed}" already exists.`)
+      return
+    }
+
+    const nextPlaylists = playlists.map((p) => (p === oldName ? trimmed : p))
+    const nextPlaylistTracks = { ...playlistTracks }
+    if (nextPlaylistTracks[oldName]) {
+      nextPlaylistTracks[trimmed] = nextPlaylistTracks[oldName]
+      delete nextPlaylistTracks[oldName]
+    }
+
+    const nextCovers = { ...playlistCovers }
+    if (nextCovers[oldName]) {
+      nextCovers[trimmed] = nextCovers[oldName]
+      delete nextCovers[oldName]
+    }
+
+    setPlaylists(nextPlaylists)
+    setPlaylistTracks(nextPlaylistTracks)
+    setPlaylistCovers(nextCovers)
+    
+    if (activePlaylist === oldName) {
+      setActivePlaylist(trimmed)
+    }
+
+    await persistSettings({
+      playlists: nextPlaylists,
+      playlistTracks: nextPlaylistTracks,
+      playlistCovers: nextCovers
+    })
+  }
+
+  const handleDeletePlaylist = async (name: string) => {
+    const confirmDelete = window.confirm(`Are you sure you want to delete the playlist "${name}"?`)
+    if (!confirmDelete) return
+
+    const nextPlaylists = playlists.filter((p) => p !== name)
+    const nextPlaylistTracks = { ...playlistTracks }
+    delete nextPlaylistTracks[name]
+
+    setPlaylists(nextPlaylists)
+    setPlaylistTracks(nextPlaylistTracks)
+
+    if (activePlaylist === name) {
+      setActivePlaylist(null)
+    }
+
+    await persistSettings({
+      playlists: nextPlaylists,
+      playlistTracks: nextPlaylistTracks
+    })
+  }
+
+  const handleExportPlaylist = async (name: string) => {
+    const pTracks = playlistTracks[name] || []
+    if (pTracks.length === 0) {
+      alert('Cannot export an empty playlist!')
+      return
+    }
+
+    setIsScanning(true)
+    try {
+      const result = await window.api.exportPlaylist(name, pTracks)
+      if (result.success) {
+        alert(`Playlist exported successfully to:\n${result.destination}`)
+      } else if (result.reason !== 'canceled') {
+        alert(`Export failed: ${result.reason}`)
+      }
+    } catch (err: any) {
+      alert(`Export failed: ${err.message || err}`)
+    } finally {
+      setIsScanning(false)
     }
   }
 
@@ -403,6 +635,23 @@ export default function App(): React.JSX.Element {
   const totalArtistsCount = useMemo(() => {
     return new Set(tracks.map((t) => t.artist)).size
   }, [tracks])
+
+  const addableTracks = useMemo(() => {
+    if (!activePlaylist) return []
+    const currentPaths = playlistTracks[activePlaylist] || []
+    return tracks.filter((t) => !currentPaths.includes(t.filePath))
+  }, [tracks, playlistTracks, activePlaylist])
+
+  const filteredAddableTracks = useMemo(() => {
+    const available = addableTracks
+    if (!playlistSearch.trim()) {
+      return available.slice(0, 10)
+    }
+    const q = playlistSearch.toLowerCase()
+    return available
+      .filter((t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q))
+      .slice(0, 10)
+  }, [addableTracks, playlistSearch])
 
   // Filtered tracks based on view, playlist, album, and search query
   const displayedTracks = useMemo(() => {
@@ -453,6 +702,28 @@ export default function App(): React.JSX.Element {
     return result
   }, [tracks, currentView, activePlaylist, activeAlbum, favorites, playlistTracks, searchQuery, sortField, sortOrder])
 
+  const playlistDurationStr = useMemo(() => {
+    if (!activePlaylist) return ''
+    const totalSecs = displayedTracks.reduce((sum, t) => sum + (t.duration || 0), 0)
+    if (totalSecs <= 0) return '0 min'
+    const hrs = Math.floor(totalSecs / 3600)
+    const mins = Math.floor((totalSecs % 3600) / 60)
+    if (hrs > 0) {
+      return `about ${hrs} hr ${mins} min`
+    }
+    return `${mins} min`
+  }, [activePlaylist, displayedTracks])
+
+  const playlistCoverSrc = useMemo(() => {
+    if (!activePlaylist) return null
+    if (playlistCovers[activePlaylist]) {
+      return playlistCovers[activePlaylist]
+    }
+    // Fallback: use first song with cover art in the playlist
+    const songWithCover = displayedTracks.find((s) => s.coverArt)
+    return songWithCover ? songWithCover.coverArt : null
+  }, [activePlaylist, playlistCovers, displayedTracks])
+
   // ─── Handlers ───────────────────────────────────────────────────────
   const handlePlayTrack = (track: TrackMeta) => {
     // Provide queue context so next/prev can advance sequentially within current filtered list
@@ -493,6 +764,8 @@ export default function App(): React.JSX.Element {
           }
         }}
         onCreatePlaylist={handleCreatePlaylist}
+        onAddFolder={handleSelectAndAddFolder}
+        onImportAudio={handleImportFiles}
         albums={albums}
         activeAlbum={activeAlbum}
         setActiveAlbum={(albumName) => {
@@ -503,13 +776,35 @@ export default function App(): React.JSX.Element {
           }
         }}
         playlistTracks={playlistTracks}
+        playlistCovers={playlistCovers}
+        tracks={tracks}
       />
 
       {/* Main Panel */}
       <main className="main-content">
         {/* Search Bar / Action Bar */}
-        <div className="search-bar-container">
-          <div className="search-input-wrapper">
+        <div className="search-bar-container" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {(activeAlbum || activePlaylist || searchQuery) && (
+            <button
+              className="btn-control"
+              onClick={handleClearFilters}
+              style={{
+                border: '1px solid rgba(255,255,255,0.05)',
+                backgroundColor: 'var(--bg-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '38px',
+                height: '38px',
+                minWidth: '38px',
+                borderRadius: '50%'
+              }}
+              title="Back"
+            >
+              <ArrowLeft size={16} weight="light" />
+            </button>
+          )}
+          <div className="search-input-wrapper" style={{ flexGrow: 1, maxWidth: '320px' }}>
             <MagnifyingGlass size={18} weight="light" />
             <input
               ref={searchInputRef}
@@ -528,18 +823,52 @@ export default function App(): React.JSX.Element {
             <h2 className="section-title">Settings</h2>
             
             <div className="settings-section">
-              <div className="settings-row">
+              <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '16px' }}>
                 <div className="settings-label">
-                  <span className="settings-title">Music Library Folder</span>
-                  <span className="settings-subtitle">Select where your local audio files are located</span>
+                  <span className="settings-title">Music Library Folders</span>
+                  <span className="settings-subtitle">Manage local folders scanned for audio files</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  {libraryFolder && <span className="settings-value">{libraryFolder}</span>}
-                  <button className="btn-primary" onClick={handleSelectFolder}>
-                    <FolderOpen size={16} weight="light" />
-                    <span>Choose Folder</span>
-                  </button>
-                </div>
+                
+                {libraryFolders.length === 0 ? (
+                  <div style={{ color: 'var(--text-tertiary)', fontSize: '13px', fontStyle: 'italic', padding: '4px 0' }}>
+                    No folders added yet.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                    {libraryFolders.map((folder) => (
+                      <div key={folder} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', width: '100%', boxSizing: 'border-box' }}>
+                        <span style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '80%' }} title={folder}>
+                          {folder}
+                        </span>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <button 
+                            className="btn-control" 
+                            title="Sync folder"
+                            style={{ padding: '6px', height: '30px', width: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            onClick={() => handleScanFolder(folder)}
+                            disabled={isScanning}
+                          >
+                            <ArrowClockwise size={14} className={isScanning && libraryFolder === folder ? 'animate-spin' : ''} />
+                          </button>
+                          <button 
+                            className="btn-control danger-hover" 
+                            title="Remove folder"
+                            style={{ padding: '6px', height: '30px', width: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            onClick={() => handleRemoveFolder(folder)}
+                            disabled={isScanning}
+                          >
+                            <Trash size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                <button className="btn-primary" onClick={handleSelectAndAddFolder} disabled={isScanning}>
+                  <FolderOpen size={16} weight="light" />
+                  <span>Add Music Folder</span>
+                </button>
               </div>
 
               <div className="settings-row">
@@ -552,21 +881,6 @@ export default function App(): React.JSX.Element {
                   <span>Import Audio Files</span>
                 </button>
               </div>
-
-              {libraryFolder && (
-                <div className="settings-row">
-                  <div className="settings-label">
-                    <span className="settings-title">Sync Your Songs</span>
-                    <span className="settings-subtitle">Scans your library folder for new tracks and compiles metadata tags</span>
-                  </div>
-                  <button className="btn-secondary" onClick={() => handleScanFolder(libraryFolder)} disabled={isScanning}>
-                    <span>{isScanning ? 'Syncing...' : 'Sync Your Songs'}</span>
-                    <div className="btn-icon-circle">
-                      <ArrowClockwise size={14} weight="light" className={isScanning ? 'animate-spin' : ''} />
-                    </div>
-                  </button>
-                </div>
-              )}
 
               <div className="settings-row" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px' }}>
                 <div className="settings-label">
@@ -655,7 +969,7 @@ export default function App(): React.JSX.Element {
             <p>
               To get started, select the folder on your computer where your local music files are stored. We'll automatically index your tracks.
             </p>
-            <button className="btn-primary" onClick={handleSelectFolder} style={{ marginTop: '8px' }}>
+            <button className="btn-primary" onClick={handleSelectAndAddFolder} style={{ marginTop: '8px' }}>
               <FolderOpen size={18} weight="light" />
               <span>Select Music Folder</span>
             </button>
@@ -663,23 +977,123 @@ export default function App(): React.JSX.Element {
         ) : (
           /* Dashboard or Track List Views */
           <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            {/* Header section with back button if active filter is set */}
-            {(activeAlbum || activePlaylist || searchQuery) && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <button
-                  className="btn-control"
-                  onClick={handleClearFilters}
-                  style={{ border: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'var(--bg-secondary)' }}
-                >
-                  <ArrowLeft size={16} weight="light" />
-                </button>
-                <div>
-                  <h2 className="section-title" style={{ marginBottom: 0 }}>
-                    {activeAlbum ? `Album: ${activeAlbum}` : activePlaylist ? `Playlist: ${activePlaylist}` : 'Search Results'}
-                  </h2>
-                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                    {displayedTracks.length} tracks found
-                  </span>
+            {/* Header section if active filter is set */}
+            {((activeAlbum || searchQuery) && !activePlaylist) && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div>
+                    <h2 className="section-title" style={{ marginBottom: 0 }}>
+                      {activeAlbum ? `Album: ${activeAlbum}` : 'Search Results'}
+                    </h2>
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                      {displayedTracks.length} tracks found
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Playlist Spotify-style banner and control row */}
+            {activePlaylist && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="playlist-banner">
+
+                  <div className="playlist-banner-cover" onClick={() => handleChangePlaylistCover(activePlaylist)}>
+                    {playlistCoverSrc ? (
+                      <img src={playlistCoverSrc} alt={activePlaylist} />
+                    ) : (
+                      <MusicNotes size={64} weight="light" color="var(--text-tertiary)" />
+                    )}
+                    <div className="playlist-pfp-overlay">
+                      <PencilSimple size={24} weight="light" />
+                      <span>Change Photo</span>
+                    </div>
+                  </div>
+
+                  <div className="playlist-banner-details">
+                    <span className="playlist-banner-type">Playlist</span>
+                    <h1 
+                      className="playlist-banner-title" 
+                      onClick={() => handleRenamePlaylist(activePlaylist)}
+                      style={{ cursor: 'pointer' }}
+                      title="Click to rename playlist"
+                    >
+                      {activePlaylist}
+                    </h1>
+                    <div className="playlist-banner-meta">
+                      <span className="playlist-banner-owner">Bonkey User</span>
+                      <span className="playlist-banner-bullet">•</span>
+                      <span className="playlist-banner-stats">
+                        {displayedTracks.length} {displayedTracks.length === 1 ? 'song' : 'songs'}
+                      </span>
+                      {playlistDurationStr && (
+                        <>
+                          <span className="playlist-banner-bullet">•</span>
+                          <span className="playlist-banner-stats" style={{ color: 'var(--text-secondary)' }}>
+                            {playlistDurationStr}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="playlist-controls-row">
+                  <div className="playlist-controls-left">
+                    <button
+                      className="btn-play-large"
+                      onClick={handlePlayPlaylist}
+                      title="Play Playlist"
+                      disabled={displayedTracks.length === 0}
+                      style={{ opacity: displayedTracks.length === 0 ? 0.5 : 1 }}
+                    >
+                      <Play size={28} weight="fill" />
+                    </button>
+                  </div>
+                  <div className="playlist-controls-right" style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                      className="btn-control"
+                      title="Rename Playlist"
+                      onClick={() => handleRenamePlaylist(activePlaylist)}
+                      style={{
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        backgroundColor: 'var(--bg-secondary)',
+                        width: '44px',
+                        height: '44px',
+                        minWidth: '44px'
+                      }}
+                    >
+                      <PencilSimple size={22} weight="light" />
+                    </button>
+                    <button
+                      className="btn-control"
+                      title="Export Playlist as Folder"
+                      onClick={() => handleExportPlaylist(activePlaylist)}
+                      style={{
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        backgroundColor: 'var(--bg-secondary)',
+                        width: '44px',
+                        height: '44px',
+                        minWidth: '44px'
+                      }}
+                    >
+                      <DownloadSimple size={22} weight="light" />
+                    </button>
+                    <button
+                      className="btn-control danger-hover"
+                      title="Delete Playlist"
+                      onClick={() => handleDeletePlaylist(activePlaylist)}
+                      style={{
+                        border: '1px solid rgba(255,78,46,0.1)',
+                        backgroundColor: 'var(--bg-secondary)',
+                        width: '44px',
+                        height: '44px',
+                        minWidth: '44px'
+                      }}
+                    >
+                      <Trash size={22} weight="light" />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -734,7 +1148,68 @@ export default function App(): React.JSX.Element {
                       setSortOrder('asc')
                     }
                   }}
+                  playlists={playlists}
+                  onAddToPlaylist={handleAddToPlaylist}
+                  onAddToNewPlaylist={handleCreatePlaylist}
+                  onRemoveFromPlaylist={handleRemoveFromPlaylist}
+                  currentPlaylistName={activePlaylist}
+                  onReorderTracks={activePlaylist ? handleReorderPlaylistTracks : undefined}
                 />
+
+                {activePlaylist && (
+                  <div className="playlist-builder-section" style={{ marginTop: '40px', paddingTop: '32px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <h3 className="section-title" style={{ fontSize: '16px', marginBottom: '8px' }}>Let's add some songs to your playlist</h3>
+                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>Search for songs in your library to add them directly.</p>
+                    
+                    <div className="playlist-builder-search" style={{ marginBottom: '20px', maxWidth: '400px' }}>
+                      <div className="search-input-wrapper" style={{ height: '36px' }}>
+                        <MagnifyingGlass size={16} weight="light" />
+                        <input
+                          type="text"
+                          className="search-input"
+                          placeholder="Search in your library..."
+                          value={playlistSearch}
+                          onChange={(e) => setPlaylistSearch(e.target.value)}
+                          style={{ fontSize: '13px' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="playlist-builder-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {filteredAddableTracks.length === 0 ? (
+                        <span style={{ fontSize: '13px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+                          No songs found to add.
+                        </span>
+                      ) : (
+                        filteredAddableTracks.map((track) => (
+                          <div key={track.filePath} className="playlist-builder-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div className="track-thumbnail" style={{ width: '32px', height: '32px' }}>
+                                {track.coverArt ? (
+                                  <img src={track.coverArt} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                  <MusicNotes size={14} weight="light" />
+                                )}
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{track.title}</span>
+                                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{track.artist}</span>
+                              </div>
+                            </div>
+                            <button
+                              className="btn-control"
+                              title="Add to Playlist"
+                              onClick={() => handleAddToPlaylist(activePlaylist, track)}
+                              style={{ padding: '6px 12px', fontSize: '12px', color: 'var(--accent)', borderColor: 'rgba(255, 78, 46, 0.2)' }}
+                            >
+                              <span>Add</span>
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -773,7 +1248,76 @@ export default function App(): React.JSX.Element {
         onToggleLyrics={() => setIsLyricsOpen((prev) => !prev)}
         isLyricsOpen={isLyricsOpen}
         displayedTracks={displayedTracks}
+        playlists={playlists}
+        favorites={favorites}
+        onAddToQueue={addToQueue}
+        onToggleFavorite={handleToggleFavorite}
+        onAddToPlaylist={handleAddToPlaylist}
+        onAddToNewPlaylist={handleCreatePlaylist}
       />
+
+      {/* Create New Playlist Custom Modal */}
+      {isCreatePlaylistOpen && (
+        <div className="modal-overlay" onClick={() => {
+          setIsCreatePlaylistOpen(false)
+          setPlaylistTrackPending(null)
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Create New Playlist</h3>
+              <button 
+                className="btn-modal-close" 
+                onClick={() => {
+                  setIsCreatePlaylistOpen(false)
+                  setPlaylistTrackPending(null)
+                }}
+              >
+                <X size={18} weight="light" />
+              </button>
+            </div>
+            <div className="modal-body">
+              <label htmlFor="new-playlist-input">Playlist Name</label>
+              <input
+                id="new-playlist-input"
+                type="text"
+                className="modal-input"
+                placeholder="My Awesome Playlist"
+                value={newPlaylistName}
+                onChange={(e) => setNewPlaylistName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSubmitNewPlaylist()
+                  }
+                }}
+                autoFocus
+              />
+              {playlistTrackPending && (
+                <div className="modal-pending-info">
+                  <span>Adding song: <strong>{playlistTrackPending.title}</strong> by {playlistTrackPending.artist}</span>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="btn-modal-cancel" 
+                onClick={() => {
+                  setIsCreatePlaylistOpen(false)
+                  setPlaylistTrackPending(null)
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn-modal-submit"
+                onClick={handleSubmitNewPlaylist}
+                disabled={!newPlaylistName.trim()}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

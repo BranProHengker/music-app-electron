@@ -16,7 +16,13 @@ const musicAPI = {
   selectFiles: (): Promise<string[] | null> => ipcRenderer.invoke('select-files'),
   importFiles: (filePaths: string[]): Promise<unknown[]> => ipcRenderer.invoke('import-files', filePaths),
   updateDiscordStatus: (songData: unknown): void => ipcRenderer.send('update-discord-status', songData),
-  resetLibrary: (): Promise<unknown[]> => ipcRenderer.invoke('reset-library')
+  resetLibrary: (): Promise<unknown[]> => ipcRenderer.invoke('reset-library'),
+  exportPlaylist: (name: string, filePaths: string[]): Promise<any> =>
+    ipcRenderer.invoke('export-playlist', name, filePaths),
+  removeLibraryFolder: (path: string): Promise<unknown[]> =>
+    ipcRenderer.invoke('remove-library-folder', path),
+  selectImage: (): Promise<string | null> =>
+    ipcRenderer.invoke('select-image')
 }
 
 // Use contextBridge to expose APIs securely

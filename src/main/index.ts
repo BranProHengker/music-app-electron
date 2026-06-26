@@ -9,8 +9,8 @@ import {
   Tray,
   Menu
 } from 'electron'
-import { join } from 'path'
-import { readFile, writeFile, readdir } from 'fs/promises'
+import { join, basename } from 'path'
+import { readFile, writeFile, readdir, copyFile, mkdir } from 'fs/promises'
 import { existsSync, createReadStream, statSync } from 'fs'
 import { electronApp, is } from '@electron-toolkit/utils'
 import DiscordRPC from 'discord-rpc'
@@ -382,7 +382,7 @@ app.whenReady().then(async () => {
         } catch {}
       }
 
-      const tracks: TrackMeta[] = []
+      const scannedTracks: TrackMeta[] = []
       const { parseFile } = await import('music-metadata')
 
       for (const file of files) {
@@ -399,7 +399,7 @@ app.whenReady().then(async () => {
             coverArt = `data:${pic.format};base64,${base64}`
           }
 
-          tracks.push({
+          scannedTracks.push({
             filePath: file,
             title:
               common.title ||
@@ -427,8 +427,20 @@ app.whenReady().then(async () => {
         }
       }
 
+      // Merge new scanned tracks with the current library
+      const currentLibrary = await loadLibrary()
+      const newTracks: TrackMeta[] = []
+
+      for (const track of scannedTracks) {
+        if (!currentLibrary.some((t) => t.filePath === track.filePath)) {
+          newTracks.push(track)
+        }
+      }
+
+      const updatedTracks = [...currentLibrary, ...newTracks]
+
       // Sort by artist, then album, then track number
-      tracks.sort((a, b) => {
+      updatedTracks.sort((a, b) => {
         const artistCmp = a.artist.localeCompare(b.artist)
         if (artistCmp !== 0) return artistCmp
         const albumCmp = a.album.localeCompare(b.album)
@@ -436,16 +448,61 @@ app.whenReady().then(async () => {
         return (a.trackNumber || 0) - (b.trackNumber || 0)
       })
 
-      await saveLibrary(tracks)
+      await saveLibrary(updatedTracks)
 
-      // Save folder path in settings
+      // Save folder paths in settings
       const settings = await loadSettings()
-      settings.libraryFolder = folderPath
+      let folders: string[] = Array.isArray(settings.libraryFolders)
+        ? (settings.libraryFolders as string[])
+        : []
+
+      // Fallback transition
+      if (settings.libraryFolder && typeof settings.libraryFolder === 'string' && !folders.includes(settings.libraryFolder)) {
+        folders.push(settings.libraryFolder)
+      }
+
+      if (!folders.includes(folderPath)) {
+        folders.push(folderPath)
+      }
+
+      settings.libraryFolders = folders
+      settings.libraryFolder = folderPath // last scanned
       await saveSettings(settings)
 
-      return tracks
+      return updatedTracks
     } catch (error) {
       console.error('Scan error:', error)
+      return []
+    }
+  })
+
+  // ─── IPC: Remove Library Folder ──────────────────────────────────
+  ipcMain.handle('remove-library-folder', async (_event, folderPath: string) => {
+    try {
+      const settings = await loadSettings()
+      let folders: string[] = Array.isArray(settings.libraryFolders)
+        ? (settings.libraryFolders as string[])
+        : []
+      folders = folders.filter((f) => f !== folderPath)
+      settings.libraryFolders = folders
+      if (settings.libraryFolder === folderPath) {
+        settings.libraryFolder = folders[0] || null
+      }
+      await saveSettings(settings)
+
+      const currentLibrary = await loadLibrary()
+      const path = await import('path')
+      const normFolder = path.normalize(folderPath).toLowerCase()
+
+      const updatedTracks = currentLibrary.filter((track) => {
+        const normTrack = path.normalize(track.filePath).toLowerCase()
+        return !normTrack.startsWith(normFolder)
+      })
+
+      await saveLibrary(updatedTracks)
+      return updatedTracks
+    } catch (error) {
+      console.error('Remove folder error:', error)
       return []
     }
   })
@@ -463,6 +520,7 @@ app.whenReady().then(async () => {
       delete settings.lastPlayedTrack
       delete settings.lastPlayedTime
       delete settings.libraryFolder
+      delete settings.libraryFolders
       await saveSettings(settings)
       return []
     } catch (error) {
@@ -535,6 +593,37 @@ app.whenReady().then(async () => {
     return result.filePaths
   })
 
+  // ─── IPC: Select Image ───────────────────────────────────────────
+  ipcMain.handle('select-image', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'] }
+      ],
+      title: 'Select Playlist Cover Image'
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    
+    const filePath = result.filePaths[0]
+    const fs = await import('fs/promises')
+    const path = await import('path')
+    
+    const mimeTypes: Record<string, string> = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.bmp': 'image/bmp'
+    }
+    
+    const ext = path.extname(filePath).toLowerCase()
+    const mime = mimeTypes[ext] || 'image/jpeg'
+    const buffer = await fs.readFile(filePath)
+    const base64 = buffer.toString('base64')
+    return `data:${mime};base64,${base64}`
+  })
+
   // ─── IPC: Import Files ───────────────────────────────────────────
   ipcMain.handle('import-files', async (_event, filePaths: string[]) => {
     try {
@@ -599,6 +688,42 @@ app.whenReady().then(async () => {
     } catch (error) {
       console.error('Import error:', error)
       return []
+    }
+  })
+
+  // ─── IPC: Export Playlist ──────────────────────────────────────────
+  ipcMain.handle('export-playlist', async (_event, playlistName: string, filePaths: string[]) => {
+    try {
+      const result = await dialog.showOpenDialog(mainWindow!, {
+        properties: ['openDirectory', 'createDirectory'],
+        title: 'Select Destination Folder to Export Playlist'
+      })
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, reason: 'canceled' }
+      }
+      
+      const targetDir = result.filePaths[0]
+      // Replace unsafe characters in playlist name for directory safety
+      const safePlaylistName = playlistName.replace(/[\\/:*?"<>|]/g, '_')
+      const exportFolder = join(targetDir, safePlaylistName)
+      
+      if (!existsSync(exportFolder)) {
+        await mkdir(exportFolder, { recursive: true })
+      }
+      
+      let copiedCount = 0
+      for (const file of filePaths) {
+        if (existsSync(file)) {
+          const destFile = join(exportFolder, basename(file))
+          await copyFile(file, destFile)
+          copiedCount++
+        }
+      }
+      
+      return { success: true, count: copiedCount, destination: exportFolder }
+    } catch (err: any) {
+      console.error('Export playlist error:', err)
+      return { success: false, reason: err.message || 'Unknown error' }
     }
   })
 
