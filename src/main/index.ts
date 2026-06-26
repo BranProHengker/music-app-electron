@@ -816,32 +816,57 @@ app.whenReady().then(async () => {
     }
 
     try {
-      if (!songData || !songData.isPlaying || !songData.title) {
-        console.log('[Discord RPC] Clearing activity (not playing or no title)')
+      // Only clear activity when there's truly nothing to show
+      if (!songData || !songData.title) {
+        console.log('[Discord RPC] Clearing activity (no track)')
         rpcClient.clearActivity().catch(() => {})
         return
       }
 
-      // Calculate timestamps
-      const startTimestamp = Date.now() - (songData.currentTime * 1000)
+      if (songData.isPlaying) {
+        // Playing: show track with elapsed timestamp
+        const startTimestamp = Date.now() - (songData.currentTime * 1000)
 
-      const activityPayload = {
-        details: songData.title,
-        state: `by ${songData.artist}`,
-        startTimestamp: Math.floor(startTimestamp / 1000),
-        largeImageKey: 'logo_app',
-        largeImageText: 'Bonkey Music',
-        instance: false
+        const activityPayload = {
+          details: songData.title,
+          state: `by ${songData.artist}`,
+          startTimestamp: Math.floor(startTimestamp / 1000),
+          largeImageKey: 'logo_app',
+          largeImageText: 'Bonkey Music',
+          smallImageKey: 'play_icon',
+          smallImageText: 'Playing',
+          instance: false
+        }
+
+        console.log('[Discord RPC] Setting activity (playing):', activityPayload)
+        rpcClient.setActivity(activityPayload)
+          .then(() => {
+            console.log('[Discord RPC] setActivity resolved successfully')
+          })
+          .catch((err) => {
+            console.warn('[Discord RPC] Failed to set activity:', err)
+          })
+      } else {
+        // Paused: show track info with "Paused" state, no timestamp
+        const activityPayload = {
+          details: songData.title,
+          state: `by ${songData.artist} • Paused`,
+          largeImageKey: 'logo_app',
+          largeImageText: 'Bonkey Music',
+          smallImageKey: 'pause_icon',
+          smallImageText: 'Paused',
+          instance: false
+        }
+
+        console.log('[Discord RPC] Setting activity (paused):', activityPayload)
+        rpcClient.setActivity(activityPayload)
+          .then(() => {
+            console.log('[Discord RPC] setActivity (paused) resolved successfully')
+          })
+          .catch((err) => {
+            console.warn('[Discord RPC] Failed to set paused activity:', err)
+          })
       }
-
-      console.log('[Discord RPC] Setting activity payload:', activityPayload)
-      rpcClient.setActivity(activityPayload)
-        .then(() => {
-          console.log('[Discord RPC] setActivity resolved successfully')
-        })
-        .catch((err) => {
-          console.warn('[Discord RPC] Failed to set activity:', err)
-        })
     } catch (err) {
       console.error('[Discord RPC] Error in activity update:', err)
     }
